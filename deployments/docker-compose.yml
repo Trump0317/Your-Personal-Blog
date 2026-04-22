@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  hub:
+    build:
+      context: .
+      dockerfile: deployments/hub.Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data/hub:/app/data
+
+  blog-server:
+    build:
+      context: .
+      dockerfile: deployments/client.Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - hub
+    volumes:
+      - ./data/blog:/app/data
