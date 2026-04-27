@@ -20,15 +20,37 @@ profile.cov
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
-# Go workspace file
+# Go workspace file (Keep locally, don't push)
 go.work
 go.work.sum
+
+# SQLite database files (Crucial for Storage Hub)
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Storage Hub physical files (Local Storage)
+data/
+uploads/
+/internal/hub/storage/local/temp/
+
+# Log files
+*.log
 
 # env file
 .env
 
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
+
+# Build outputs
+bin/
+dist/
+
+# OS specific files
+.DS_Store
+Thumbs.db
 
 doc
