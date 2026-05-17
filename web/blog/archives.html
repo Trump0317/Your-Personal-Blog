@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文章归档 - TechBlog</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>[v-cloak] { display: none; }</style>
+</head>
+<body class="bg-gray-50 text-gray-900 font-sans">
+    <div id="app" v-cloak class="min-h-screen flex flex-col">
+        <!-- 导航栏 -->
+        <nav class="bg-white shadow-sm sticky top-0 z-10">
+            <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex items-center space-x-8">
+                        <a href="/blog/visitor/index" class="text-2xl font-bold text-blue-600 tracking-tight">TechBlog</a>
+                        <div class="hidden md:flex items-center space-x-6">
+                            <a href="/blog/visitor/index" class="text-gray-600 hover:text-blue-600 font-medium">首页</a>
+                            <a href="/blog/visitor/categories/page" class="text-gray-600 hover:text-blue-600 font-medium">分类</a>
+                            <a href="/blog/visitor/tags/page" class="text-gray-600 hover:text-blue-600 font-medium">标签</a>
+                            <a href="/blog/visitor/archives/page" class="text-blue-600 font-bold">归档</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <main class="flex-grow max-w-3xl mx-auto px-4 py-12 w-full">
+            <h1 class="text-3xl font-bold mb-12 flex items-center">
+                <span class="w-1.5 h-8 bg-blue-600 mr-3 rounded"></span>
+                文章归档
+            </h1>
+            
+            <div v-if="loading" class="flex justify-center py-12">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            </div>
+
+            <div v-else class="space-y-12">
+                <div v-for="(group, monthKey) in archives" :key="monthKey" class="relative pl-8 border-l-2 border-gray-200">
+                    <!-- 月份时间圆点 -->
+                    <div class="absolute -left-[9px] top-1 w-4 h-4 bg-blue-600 rounded-full border-4 border-white"></div>
+                    
+                    <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center">
+                        {{ monthKey }}
+                        <span class="ml-3 text-sm font-normal text-gray-400">({{ group.length }} 篇文章)</span>
+                    </h2>
+
+                    <div class="space-y-6">
+                        <div v-for="post in group" :key="post.id" 
+                             @click="viewPost(post)"
+                             class="group cursor-pointer">
+                            <div class="flex items-baseline space-x-4">
+                                <span class="text-sm text-gray-400 font-mono">{{ formatDateDay(post.created_at) }}</span>
+                                <h3 class="text-lg text-gray-700 group-hover:text-blue-600 group-hover:translate-x-1 transition-all">
+                                    {{ post.title }}
+                                </h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const { createApp, ref, onMounted, computed } = Vue;
+        createApp({
+            setup() {
+                const posts = ref([]);
+                const loading = ref(true);
+
+                const fetchPosts = async () => {
+                    try {
+                        const res = await fetch('/blog/visitor/posts?page_size=100');
+                        const data = await res.json();
+                        posts.value = data.posts || [];
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+
+                // 按年月分组逻辑
+                const archives = computed(() => {
+                    const groups = {};
+                    posts.value.forEach(post => {
+                        const date = new Date(post.created_at);
+                        const monthKey = `${date.getFullYear()}年${date.getMonth() + 1}月`;
+                        if (!groups[monthKey]) groups[monthKey] = [];
+                        groups[monthKey].push(post);
+                    });
+                    return groups;
+                });
+
+                const formatDateDay = (dateStr) => {
+                    const date = new Date(dateStr);
+                    return date.getDate().toString().padStart(2, '0') + '日';
+                };
+
+                const viewPost = (post) => {
+                    window.location.href = `/blog/visitor/post/${post.slug || post.id}/page`;
+                };
+
+                onMounted(fetchPosts);
+                return { archives, loading, viewPost, formatDateDay };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

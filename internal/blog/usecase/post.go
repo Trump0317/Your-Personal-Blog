@@ -2,120 +2,164 @@ package usecase
 
 import (
 	"context"
-	"strconv"
+	"fmt"
+	"time"
 
 	"github.com/ypb/your-personal-blog/internal/blog/model"
 	"github.com/ypb/your-personal-blog/internal/blog/repo"
-	"github.com/ypb/your-personal-blog/internal/blog/usecase/input"
-	"github.com/ypb/your-personal-blog/internal/blog/usecase/output"
 )
 
 type postUsecase struct {
-	postRepo repo.PostRepo
+	postRepo     repo.PostRepo
+	categoryRepo repo.CategoryRepo
 }
 
-func NewPostUsecase(r repo.PostRepo) Post {
-	return &postUsecase{postRepo: r}
+// NewPostUsecase 创建文章业务逻辑实例
+func NewPostUsecase(pr repo.PostRepo, cr repo.CategoryRepo) Post {
+	return &postUsecase{
+		postRepo:     pr,
+		categoryRepo: cr,
+	}
 }
 
-func (u *postUsecase) Create(ctx context.Context, in *input.PostCreate) (int64, error) {
+func (u *postUsecase) Create(ctx context.Context, in *PostCreateInput) (string, error) {
+	// 1. 构造文章模型
 	post := &model.Post{
+		ID:         fmt.Sprintf("post_%d", time.Now().UnixNano()), // 临时生成 ID
 		Title:      in.Title,
 		Slug:       in.Slug,
-		Content:    in.Content,
 		Summary:    in.Summary,
-		IsTop:      in.IsTop,
+		Content:    in.Content,
 		CategoryID: in.CategoryID,
-		Status:     model.PostDraft,
+		TagIDs:     in.TagIDs,
+		Status:     in.Status,
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
 	}
-	err := u.postRepo.Create(ctx, post)
-	return post.ID, err
+
+	if in.Status == model.PostPublished {
+		now := time.Now()
+		post.PublishedAt = &now
+	}
+
+	// 2. 保存文章本体
+	if err := u.postRepo.Create(ctx, post); err != nil {
+		return "", fmt.Errorf("failed to create post: %w", err)
+	}
+
+	// 3. 保存标签关联关系
+	if err := u.postRepo.SetTags(ctx, post.ID, in.TagIDs); err != nil {
+		return "", fmt.Errorf("failed to set post tags: %w", err)
+	}
+
+	return post.ID, nil
 }
 
-func (u *postUsecase) Update(ctx context.Context, in *input.PostUpdate) error {
-	post, err := u.postRepo.GetByID(ctx, in.ID)
+func (u *postUsecase) Update(ctx context.Context, in *PostUpdateInput) error {
+	// 1. 获取原文章
+	existing, err := u.postRepo.GetByID(ctx, in.ID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get existing post: %w", err)
 	}
 
+	// 2. 处理标签更新
+	if in.TagIDs != nil {
+		if err := u.postRepo.SetTags(ctx, in.ID, *in.TagIDs); err != nil {
+			return err
+		}
+		existing.TagIDs = *in.TagIDs
+	}
+
+	// 3. 更新基础字段
 	if in.Title != nil {
-		post.Title = *in.Title
+		existing.Title = *in.Title
 	}
 	if in.Slug != nil {
-		post.Slug = *in.Slug
+		existing.Slug = *in.Slug
 	}
 	if in.Content != nil {
-		post.Content = *in.Content
+		existing.Content = *in.Content
 	}
 	if in.Summary != nil {
-		post.Summary = *in.Summary
-	}
-	if in.IsTop != nil {
-		post.IsTop = *in.IsTop
-	}
-	if in.Status != nil {
-		post.Status = *in.Status
+		existing.Summary = *in.Summary
 	}
 	if in.CategoryID != nil {
-		post.CategoryID = *in.CategoryID
+		existing.CategoryID = *in.CategoryID
 	}
+	if in.Status != nil {
+		existing.Status = *in.Status
+	}
+	existing.UpdatedAt = time.Now()
 
-	return u.postRepo.Update(ctx, post)
+	return u.postRepo.Update(ctx, existing)
 }
 
-func (u *postUsecase) Delete(ctx context.Context, id int64) error {
+func (u *postUsecase) Delete(ctx context.Context, id string) error {
 	return u.postRepo.Delete(ctx, id)
 }
 
-func (u *postUsecase) Publish(ctx context.Context, id int64) error {
-	post, err := u.postRepo.GetByID(ctx, id)
-	if err != nil {
-		return err
-	}
-	post.Status = model.PostPublished
-	return u.postRepo.Update(ctx, post)
+func (u *postUsecase) Publish(ctx context.Context, id string) error {
+	return u.postRepo.UpdateStatus(ctx, id, model.PostPublished)
 }
 
-func (u *postUsecase) Unpublish(ctx context.Context, id int64) error {
-	post, err := u.postRepo.GetByID(ctx, id)
-	if err != nil {
-		return err
-	}
-	post.Status = model.PostDraft
-	return u.postRepo.Update(ctx, post)
+func (u *postUsecase) Unpublish(ctx context.Context, id string) error {
+	return u.postRepo.UpdateStatus(ctx, id, model.PostDraft)
 }
 
-func (u *postUsecase) Get(ctx context.Context, idOrSlug string) (*output.PostDetail, error) {
-	var post *model.Post
-	var err error
-	if id, err := strconv.ParseInt(idOrSlug, 10, 64); err == nil {
-		post, err = u.postRepo.GetByID(ctx, id)
-	} else {
-		post, err = u.postRepo.GetBySlug(ctx, idOrSlug)
-	}
-
+func (u *postUsecase) Get(ctx context.Context, idOrSlug string) (*model.Post, error) {
+	// 1. 获取文章本体 (尝试按 Slug, 失败则按 ID)
+	post, err := u.postRepo.GetBySlug(ctx, idOrSlug)
 	if err != nil {
-		return nil, err
+		post, err = u.postRepo.GetByID(ctx, idOrSlug)
+		if err != nil {
+			return nil, err
+		}
 	}
-
-	return &output.PostDetail{
-		ID:          post.ID,
-		Title:       post.Title,
-		Slug:        post.Slug,
-		Content:     post.Content,
-		HTMLContent: post.HTMLContent,
-		Summary:     post.Summary,
-		Status:      post.Status,
-		IsTop:       post.IsTop,
-		ViewCount:   post.ViewCount,
-		CategoryID:  post.CategoryID,
-		CreatedAt:   post.CreatedAt,
-		UpdatedAt:   post.UpdatedAt,
-		PublishedAt: post.PublishedAt,
-	}, nil
+	return post, nil
 }
 
-func (u *postUsecase) List(ctx context.Context, in *input.PostList) ([]*model.Post, int64, error) {
-	offset := (in.Page - 1) * in.PageSize
-	return u.postRepo.List(ctx, offset, in.PageSize, in.Status)
+func (u *postUsecase) List(ctx context.Context, in *PostListInput) ([]*model.Post, int64, error) {
+	page := in.Page
+	if page < 1 {
+		page = 1
+	}
+	pageSize := in.PageSize
+	if pageSize < 1 {
+		pageSize = 10
+	}
+
+	filter := &repo.PostFilter{
+		Offset: (page - 1) * pageSize,
+		Limit:  pageSize,
+	}
+
+	if in.Status != nil {
+		s := model.PostStatus(*in.Status)
+		filter.Status = &s
+	}
+
+	if in.CategoryID != nil {
+		filter.CategoryID = *in.CategoryID
+	}
+
+	if in.TagID != nil {
+		filter.TagID = *in.TagID
+	}
+
+	if in.Query != "" {
+		filter.Query = in.Query
+	}
+
+	return u.postRepo.List(ctx, filter)
+}
+
+// 辅助函数：将对象切片转为模型中的非指针切片
+func tagsToValueSlice(tags []*model.Tag) []model.Tag {
+	res := make([]model.Tag, 0, len(tags))
+	for _, t := range tags {
+		if t != nil {
+			res = append(res, *t)
+		}
+	}
+	return res
 }

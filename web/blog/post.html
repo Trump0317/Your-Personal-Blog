@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文章详情 - TechBlog</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        // 确保在任何 Vue 逻辑运行前 marked 已可用
+        if (typeof marked === 'undefined') {
+            console.error('marked.js failed to load');
+        }
+    </script>
+    <style>
+        [v-cloak] { display: none; }
+        .prose img { margin-left: auto; margin-right: auto; border-radius: 0.5rem; }
+        .prose pre { background-color: #1a202c; color: #edf2f7; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; }
+        .prose code { color: #e53e3e; background-color: #fff5f5; padding: 0.2rem 0.4rem; border-radius: 0.25rem; font-family: monospace; }
+        .prose a { color: #3182ce; text-decoration: underline; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 font-sans">
+    <div id="app" v-cloak class="min-h-screen flex flex-col">
+        <!-- 导航栏 -->
+        <nav class="bg-white shadow-sm sticky top-0 z-10">
+            <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex items-center space-x-8">
+                        <div class="flex items-center">
+                            <a href="/blog/visitor/index" class="text-2xl font-bold text-blue-600 tracking-tight transition-opacity hover:opacity-80">TechBlog</a>
+                        </div>
+                        <div class="hidden md:flex items-center space-x-6">
+                            <a href="/blog/visitor/index" class="text-gray-600 hover:text-blue-600 font-medium transition-colors">首页</a>
+                            <a href="/blog/visitor/categories/page" class="text-gray-600 hover:text-blue-600 font-medium transition-colors">分类</a>
+                            <a href="/blog/visitor/tags/page" class="text-gray-600 hover:text-blue-600 font-medium transition-colors">标签</a>
+                            <a href="/blog/visitor/archives/page" class="text-gray-600 hover:text-blue-600 font-medium transition-colors">归档</a>
+                            <a href="#" class="text-gray-600 hover:text-blue-600 font-medium transition-colors">关于</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- 文章主体 -->
+        <main class="flex-grow max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
+            <div v-if="loading" class="flex justify-center py-20">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            </div>
+
+            <div v-else-if="error" class="text-center py-20">
+                <h2 class="text-2xl font-bold text-gray-700 mb-4">{{ error }}</h2>
+                <a href="/blog/visitor/index" class="text-blue-600 hover:underline">返回首页</a>
+            </div>
+
+            <article v-else class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <!-- 头部：标题和摘要 -->
+                <header class="p-8 sm:p-12 border-b border-gray-50 bg-gradient-to-b from-blue-50/30 to-transparent">
+                    <div class="flex items-center space-x-2 text-sm text-gray-500 mb-6">
+                        <span>{{ formatDate(post.published_at || post.created_at) }}</span>
+                        <span>•</span>
+                        <span class="text-blue-600 font-medium">
+                            {{ post.category?.name || '未分类' }}
+                        </span>
+                    </div>
+                    
+                    <h1 class="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-6 leading-tight">
+                        {{ post.title }}
+                    </h1>
+
+                    <div v-if="post.summary" class="bg-gray-50 rounded-xl p-6 border-l-4 border-blue-400">
+                        <p class="text-gray-600 italic leading-relaxed text-lg">
+                            {{ post.summary }}
+                        </p>
+                    </div>
+                </header>
+
+                <!-- 中间：正文 -->
+                <div class="p-8 sm:p-12 prose max-w-none text-gray-800 leading-relaxed text-lg" 
+                     v-html="renderMarkdown(post.content)">
+                </div>
+
+                <!-- 尾部：标签 -->
+                <footer class="p-8 sm:p-12 bg-gray-50/50 border-t border-gray-50">
+                    <div class="flex flex-wrap gap-2">
+                        <span v-for="tag in post.tags" :key="tag.id" 
+                              class="text-sm bg-white border border-gray-200 text-gray-600 px-3 py-1 rounded-full shadow-sm">
+                            #{{ tag.name }}
+                        </span>
+                    </div>
+                </footer>
+            </article>
+        </main>
+
+        <!-- 页脚 -->
+        <footer class="bg-white border-t border-gray-100 py-8">
+            <div class="max-w-4xl mx-auto px-4 text-center text-gray-500 text-sm">
+                &copy; 2026 TechBlog. All rights reserved.
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        const { createApp, ref, onMounted } = Vue;
+        createApp({
+            setup() {
+                const post = ref(null);
+                const loading = ref(true);
+                const error = ref(null);
+
+                const getIDOrSlug = () => {
+                    const path = window.location.pathname;
+                    const parts = path.split('/');
+                    // path format: /blog/visitor/post/:idOrSlug/page
+                    return parts[parts.length - 2];
+                };
+
+                const fetchPost = async () => {
+                    const idOrSlug = getIDOrSlug();
+                    try {
+                        const res = await fetch(`/blog/visitor/post/${idOrSlug}`);
+                        if (!res.ok) throw new Error('文章不存在或已被删除');
+                        post.value = await res.json();
+                    } catch (e) {
+                        error.value = e.message;
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+
+                const renderMarkdown = (content) => {
+                    if (!content) return '';
+                    try {
+                        // 兼容不同版本的 marked
+                        if (typeof marked.parse === 'function') {
+                            return marked.parse(content);
+                        }
+                        return marked(content);
+                    } catch (e) {
+                        console.error('Markdown rendering error:', e);
+                        return content;
+                    }
+                };
+
+                const formatDate = (dateStr) => {
+                    if (!dateStr) return '';
+                    const date = new Date(dateStr);
+                    return date.toLocaleDateString('zh-CN', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    });
+                };
+
+                onMounted(fetchPost);
+
+                return { post, loading, error, renderMarkdown, formatDate };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

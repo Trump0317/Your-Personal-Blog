@@ -9,8 +9,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/ypb/your-personal-blog/internal/hub/model"
 	"github.com/ypb/your-personal-blog/internal/hub/repo"
-	"github.com/ypb/your-personal-blog/internal/hub/usercase/input"
-	"github.com/ypb/your-personal-blog/internal/hub/usercase/output"
 )
 
 type fileUseCase struct {
@@ -26,7 +24,7 @@ func NewFileUseCase(storageRepo repo.FileStore, dbRepo repo.FileRepo) File {
 	}
 }
 
-func (u *fileUseCase) Upload(ctx context.Context, userID string, in input.FileUpload) (*output.FileDetail, error) {
+func (u *fileUseCase) Upload(ctx context.Context, in FileUploadInput) (*FileUploadOutput, error) {
 	// 1. 生成存储路径
 	ext := filepath.Ext(in.FileName)
 	saveName := fmt.Sprintf("%s%s", uuid.New().String(), ext)
@@ -35,14 +33,14 @@ func (u *fileUseCase) Upload(ctx context.Context, userID string, in input.FileUp
 
 	// 2. 准备数据库记录
 	fileRecord := model.File{
-		UploaderID:   userID,
-		OriginalName: in.FileName,
-		FileSize:     in.Size,
-		StoragePath:  storagePath,
-		StorageType:  "local",
-		Status:       model.FileActive,
-		CreatedAt:    time.Now().Unix(),
-		UpdatedAt:    time.Now().Unix(),
+		Uploader:    in.APIKey,
+		FileName:    in.FileName,
+		FileSize:    in.Size,
+		Usage:       in.Usage,
+		StoragePath: storagePath,
+		Status:      model.FileActive,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
 	}
 
 	// 3. 执行物理存储上传 (设置默认过期时间 0 表示永久)
@@ -56,47 +54,53 @@ func (u *fileUseCase) Upload(ctx context.Context, userID string, in input.FileUp
 		return nil, fmt.Errorf("%w: %v", ErrDatabase, err)
 	}
 
-	return &output.FileDetail{
-		ID:        id,
-		FileName:  in.FileName,
-		FileSize:  in.Size,
-		Usage:     in.Usage,
-		CreatedAt: time.Now(),
+	return &FileUploadOutput{
+		ID: id,
 	}, nil
 }
 
-func (u *fileUseCase) GetByID(ctx context.Context, expires time.Duration, id string) (*output.FileDetail, error) {
+func (u *fileUseCase) GetByID(ctx context.Context, id string) (*FileDetailOutput, error) {
 	file, err := u.dbRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrDatabase, err)
 	}
 
-	return &output.FileDetail{
+	return &FileDetailOutput{
 		ID:        file.ID,
-		FileName:  file.OriginalName,
+		FileName:  file.FileName,
 		FileSize:  file.FileSize,
-		Usage:     file.StorageType,
-		CreatedAt: time.Unix(file.CreatedAt, 0),
+		MimeType:  file.MimeType,
+		Usage:     file.Usage,
+		CreatedAt: file.CreatedAt,
 	}, nil
 }
 
-func (u *fileUseCase) ListAll(ctx context.Context, userID string) ([]*output.FileDetail, error) {
-	files, err := u.dbRepo.ListByUser(ctx, userID)
+func (u *fileUseCase) ListAll(ctx context.Context, in FileListInput) ([]*FileDetailOutput, error) {
+	if in.Page <= 0 {
+		in.Page = 1
+	}
+	if in.Size <= 0 {
+		in.Size = 10
+	}
+	offset := (in.Page - 1) * in.Size
+
+	files, err := u.dbRepo.ListByUser(ctx, in.APIKey, in.Size, offset)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrDatabase, err)
 	}
 
-	var result []*output.FileDetail
+	out := make([]*FileDetailOutput, 0, len(files))
 	for _, f := range files {
-		result = append(result, &output.FileDetail{
+		out = append(out, &FileDetailOutput{
 			ID:        f.ID,
-			FileName:  f.OriginalName,
+			FileName:  f.FileName,
 			FileSize:  f.FileSize,
-			Usage:     f.StorageType,
-			CreatedAt: time.Unix(f.CreatedAt, 0),
+			MimeType:  f.MimeType,
+			Usage:     f.Usage,
+			CreatedAt: f.CreatedAt,
 		})
 	}
-	return result, nil
+	return out, nil
 }
 
 func (u *fileUseCase) Delete(ctx context.Context, id string) error {

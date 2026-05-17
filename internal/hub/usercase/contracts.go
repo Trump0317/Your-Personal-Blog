@@ -3,10 +3,6 @@ package usercase
 import (
 	"context"
 	"errors"
-	"time"
-
-	"github.com/ypb/your-personal-blog/internal/hub/usercase/input"
-	"github.com/ypb/your-personal-blog/internal/hub/usercase/output"
 )
 
 var (
@@ -17,33 +13,34 @@ var (
 )
 
 type File interface {
-	// 处理文件上传：涉及存物理文件和存数据库记录两步
-	Upload(ctx context.Context, userID string, in input.FileUpload) (*output.FileDetail, error)
+	// 文件上传：涉及存物理文件和存数据库记录两步
+	Upload(ctx context.Context, in FileUploadInput) (*FileUploadOutput, error)
 
-	// 根据 ID 获取文件信息
-	GetByID(ctx context.Context, expires time.Duration, id string) (*output.FileDetail, error)
-
-	// 获取用户下的所有文件
-	ListAll(ctx context.Context, userID string) ([]*output.FileDetail, error)
-
-	// 安全删除：同时删除物理文件和数据库记录
+	// 删除：同时删除物理文件和数据库记录
 	Delete(ctx context.Context, id string) error
+
+	// 根据文件ID 获取文件信息
+	GetByID(ctx context.Context, id string) (*FileDetailOutput, error)
+
+	// 获取用户的所有文件
+	ListAll(ctx context.Context, in FileListInput) ([]*FileDetailOutput, error)
 }
 
+// User 相关用例接口定义
 type User interface {
 	// 创建用户
-	Create(ctx context.Context, in input.UserCreate) (*output.UserDetail, error)
+	Create(ctx context.Context, in UserCreateInput) (*UserCreateOutput, error)
 
-	// 获取用户信息
-	GetByID(ctx context.Context, id string) (*output.UserDetail, error)
-
-	GetByAPIKey(ctx context.Context, apiKey string) (*output.UserDetail, error)
+	// 根据 API Key 获取用户信息
+	GetByAPIKey(ctx context.Context, apiKey string) (*UserDetailOutput, error)
 
 	// 删除用户
-	Delete(ctx context.Context, id string) error
+	Delete(ctx context.Context, apiKey string) error
+
+	// 更新用户信息
+	Update(ctx context.Context, apiKey string, in UserUpdateInput) error
 }
 
 type Admin interface {
-	GetSystemStats(ctx context.Context) (*output.SystemStats, error)
-	VerifyAPIKey(apiKey string) bool
+	GetSystemStats(ctx context.Context) (*SystemStatsOutput, error)
 }

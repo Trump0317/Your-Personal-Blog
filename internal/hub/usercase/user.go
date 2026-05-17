@@ -8,8 +8,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/ypb/your-personal-blog/internal/hub/model"
 	"github.com/ypb/your-personal-blog/internal/hub/repo"
-	"github.com/ypb/your-personal-blog/internal/hub/usercase/input"
-	"github.com/ypb/your-personal-blog/internal/hub/usercase/output"
 )
 
 type UserUseCase struct {
@@ -22,57 +20,61 @@ func NewUserUseCase(dbRepo repo.UserRepo) User {
 	}
 }
 
-func (u *UserUseCase) Create(ctx context.Context, in input.UserCreate) (*output.UserDetail, error) {
+func (u *UserUseCase) Create(ctx context.Context, in UserCreateInput) (*UserCreateOutput, error) {
 	apiKey := in.APIKey
 	if apiKey == "" {
 		apiKey = uuid.New().String()
 	}
 
+	// 如果未指定初始配额，默认 100MB
+	quota := in.InitialQuota
+	if quota <= 0 {
+		quota = 1024 * 1024 * 100
+	}
+
 	userRecord := model.User{
-		ID:           uuid.New().String(),
 		APIKey:       apiKey,
-		QuotaLimit:   1024 * 1024 * 100, // 默认 100MB
+		QuotaLimit:   quota,
 		CurrentUsage: 0,
 		Status:       model.UserActive,
-		CreatedAt:    time.Now().Unix(),
-		UpdatedAt:    time.Now().Unix(),
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
 	}
 
-	id, err := u.dbRepo.Create(ctx, userRecord)
+	_, err := u.dbRepo.Create(ctx, userRecord)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create user: %w", err)
+		return nil, fmt.Errorf("%w: %v", ErrDatabase, err)
 	}
 
-	return &output.UserDetail{
-		ID:     id,
+	return &UserCreateOutput{
 		APIKey: apiKey,
 	}, nil
 }
 
-func (u *UserUseCase) GetByID(ctx context.Context, id string) (*output.UserDetail, error) {
-	user, err := u.dbRepo.GetByID(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("user not found: %w", err)
+func (u *UserUseCase) Update(ctx context.Context, apiKey string, in UserUpdateInput) error {
+	// 目前仅返回 nil，未来可在此实现用户状态更新或配额调整
+	return nil
+}
+
+func (u *UserUseCase) Delete(ctx context.Context, apiKey string) error {
+	if err := u.dbRepo.Delete(ctx, apiKey); err != nil {
+		return fmt.Errorf("%w: %v", ErrDatabase, err)
 	}
-
-	return &output.UserDetail{
-		ID:     user.ID,
-		APIKey: user.APIKey,
-	}, nil
+	return nil
 }
 
-func (u *UserUseCase) Delete(ctx context.Context, id string) error {
-	return u.dbRepo.Delete(ctx, id)
-}
-
-func (u *UserUseCase) GetByAPIKey(ctx context.Context, apiKey string) (*output.UserDetail, error) {
+func (u *UserUseCase) GetByAPIKey(ctx context.Context, apiKey string) (*UserDetailOutput, error) {
 	user, err := u.dbRepo.GetByAPIKey(ctx, apiKey)
 	if err != nil {
-		return nil, fmt.Errorf("user not found by APIKey: %w", err)
+		return nil, fmt.Errorf("%w: %v", ErrDatabase, err)
 	}
 
-	return &output.UserDetail{
-		ID:     user.ID,
-		APIKey: user.APIKey,
+	return &UserDetailOutput{
+		APIKey:       user.APIKey,
+		QuotaLimit:   user.QuotaLimit,
+		CurrentUsage: user.CurrentUsage,
+		Status:       int(user.Status),
+		CreatedAt:    user.CreatedAt,
+		UpdatedAt:    user.UpdatedAt,
 	}, nil
 }

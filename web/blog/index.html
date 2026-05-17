@@ -2,49 +2,289 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>我的个人博客</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; text-align: center; }
-        .post-list { text-align: left; margin-top: 30px; }
-        .post-item { border-bottom: 1px solid #eee; padding: 15px 0; }
-        .post-item h3 { margin: 0 0 5px 0; }
-        .post-meta { color: #888; font-size: 0.85em; }
-        .error { color: red; }
+        [v-cloak] { display: none; }
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
     </style>
 </head>
-<body>
-    <h1>My Personal Blog</h1>
-    <p>欢迎来到我的文字世界</p>
-    <hr>
-    <div id="posts-container" class="post-list">
-        <p>正在拉取最新内容...</p>
+<body class="bg-gray-50 text-gray-900 font-sans">
+    <div id="app" v-cloak class="min-h-screen flex flex-col">
+        <!-- 导航栏 -->
+        <nav class="bg-white shadow-sm sticky top-0 z-10">
+            <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex items-center space-x-8">
+                        <div class="flex items-center">
+                            <a @click.prevent="resetFilter" href="#" class="text-2xl font-bold text-blue-600 tracking-tight transition-opacity hover:opacity-80">TechBlog</a>
+                        </div>
+                        <!-- 桌面端导航 -->
+                        <div class="hidden md:flex items-center space-x-6">
+                            <a @click.prevent="resetFilter" href="#" class="text-gray-600 hover:text-blue-600 font-medium transition-colors">首页</a>
+                            <a href="/blog/visitor/categories/page" class="text-gray-600 hover:text-blue-600 font-medium transition-colors">分类</a>
+                            <a href="/blog/visitor/tags/page" class="text-gray-600 hover:text-blue-600 font-medium transition-colors">标签</a>
+                            <a href="/blog/visitor/archives/page" class="text-gray-600 hover:text-blue-600 font-medium transition-colors">归档</a>
+                            <a href="#" class="text-gray-600 hover:text-blue-600 font-medium transition-colors">关于</a>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="relative">
+                            <input 
+                                type="text" 
+                                v-model="searchQuery" 
+                                @keyup.enter="fetchPosts"
+                                placeholder="搜索文章..."
+                                class="w-48 sm:w-64 bg-gray-100 border-none rounded-full py-2 px-4 pl-10 focus:ring-2 focus:ring-blue-500 text-sm transition-all"
+                            >
+                            <div class="absolute left-3 top-2.5 text-gray-400">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- 主内容区 -->
+        <main class="flex-grow max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+            <div class="flex flex-col gap-8">
+                <!-- 文章列表 -->
+                <div class="space-y-6">
+                    <!-- 筛选状态提示 -->
+                    <div v-if="filterCategory || filterTag || searchQuery" class="bg-blue-50 border border-blue-100 rounded-xl p-4 flex justify-between items-center transition-all">
+                        <div class="text-blue-700 flex items-center space-x-2">
+                            <span class="text-sm font-medium">当前筛选：</span>
+                            <div class="flex flex-wrap gap-2">
+                                <span v-if="filterCategory" class="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-bold">
+                                    分类: {{ getCategoryName(filterCategory) }}
+                                </span>
+                                <span v-if="filterTag" class="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-bold">
+                                    标签: #{{ filterTag }}
+                                </span>
+                                <span v-if="searchQuery" class="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-bold">
+                                    搜索: "{{ searchQuery }}"
+                                </span>
+                            </div>
+                        </div>
+                        <button @click="resetFilter" class="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            清除
+                        </button>
+                    </div>
+
+                    <div v-if="loading" class="flex justify-center py-12">
+                        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                    </div>
+                    
+                    <div v-else-if="posts.length === 0" class="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
+                        <p class="text-gray-500 text-lg">暂无相关文章</p>
+                        <button @click="resetFilter" class="mt-4 text-blue-600 hover:underline">返回首页</button>
+                    </div>
+
+                    <article v-for="post in posts" :key="post.id" class="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow border border-gray-100">
+                        <div class="p-6">
+                            <div class="flex items-center space-x-2 text-sm text-gray-500 mb-3">
+                                <span>{{ formatDate(post.created_at) || formatDate(post.published_at) }}</span>
+                                <span>•</span>
+                                <span @click="filterByCategory(post.category_id || (post.category && post.category.id))" 
+                                      class="text-blue-600 bg-blue-50 px-2 py-0.5 rounded cursor-pointer hover:bg-blue-100">
+                                    {{ post.category_name || (post.category && post.category.name) || '未分类' }}
+                                </span>
+                            </div>
+                            <h2 @click="viewPost(post)" class="text-2xl font-bold mb-3 cursor-pointer hover:text-blue-600 transition-colors">
+                                {{ post.title }}
+                            </h2>
+                            <p class="text-gray-600 mb-4 line-clamp-2 leading-relaxed">
+                                {{ post.summary || (post.content ? post.content.substring(0, 150) + '...' : '') }}
+                            </p>
+                            <div class="flex flex-wrap gap-2">
+                                <span v-for="tag in (post.tags || [])" :key="tag.id || tag" 
+                                      @click="filterByTag(tag.name || tag)"
+                                      class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded cursor-pointer hover:bg-gray-200 transition-colors">
+                                    #{{ tag.name || tag }}
+                                </span>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </main>
+
+        <!-- 文章详情模态框 -->
+        <div v-if="selectedPost" class="fixed inset-0 z-50 overflow-y-auto" @click="selectedPost = null">
+            <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+                <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+                    <div class="absolute inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm"></div>
+                </div>
+                <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+                <div @click.stop class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+                    <div class="bg-white px-6 py-8 sm:p-10">
+                        <div class="flex justify-between items-start mb-6">
+                            <h2 class="text-3xl font-extrabold text-gray-900 leading-tight">{{ selectedPost.title }}</h2>
+                            <button @click="selectedPost = null" class="text-gray-400 hover:text-gray-600 p-2 transition-colors">
+                                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="flex items-center space-x-4 text-sm text-gray-500 mb-8 pb-4 border-b">
+                            <span>发布于 {{ formatDate(selectedPost.created_at) || formatDate(selectedPost.published_at) }}</span>
+                            <span>•</span>
+                            <span class="text-blue-600 font-medium">{{ selectedPost.category_name || (selectedPost.category && selectedPost.category.name) }}</span>
+                        </div>
+                        <div class="prose max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap text-lg">
+                            {{ selectedPost.content }}
+                        </div>
+                        <div class="mt-10 flex flex-wrap gap-2 pt-6 border-t font-sm">
+                            <span v-for="tag in (selectedPost.tags || [])" :key="tag.id || tag" class="text-blue-600 bg-blue-50 px-3 py-1 rounded-full text-sm">
+                                #{{ tag.name || tag }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="bg-white border-t py-12 mt-12">
+            <div class="max-w-6xl mx-auto px-4 text-center">
+                <p class="text-gray-500 text-sm">&copy; 2026 TechBlog. Built with Vue 3 & Tailwind CSS.</p>
+            </div>
+        </footer>
     </div>
 
     <script>
-        async function fetchPosts() {
-            try {
-                // 这里的路径对应我们后端 API 的地址
-                const response = await fetch('/blog/visitor/posts');
-                const data = await response.json();
-                
-                const container = document.getElementById('posts-container');
-                if (data.posts && data.posts.length > 0) {
-                    container.innerHTML = data.posts.map(post => `
-                        <div class="post-item">
-                            <h3>${post.title}</h3>
-                            <div class="post-meta">发布时间: ${new Date(post.created_at).toLocaleString()}</div>
-                            <p>${post.summary || '点击阅读全文...'}</p>
-                        </div>
-                    `).join('');
-                } else {
-                    container.innerHTML = '<p>主人很懒，还没有写过文章内容。</p>';
-                }
-            } catch (err) {
-                document.getElementById('posts-container').innerHTML = 
-                    '<p class="error">糟糕，内容加载失败了: ' + err.message + '</p>';
+        const { createApp, ref, onMounted } = Vue;
+
+        createApp({
+            setup() {
+                const posts = ref([]);
+                const categories = ref([]);
+                const tags = ref([]);
+                const loading = ref(false);
+                const selectedPost = ref(null);
+                const searchQuery = ref('');
+                const filterCategory = ref(null);
+                const filterTag = ref(null);
+
+                const fetchPosts = async () => {
+                    loading.value = true;
+                    try {
+                        let params = new URLSearchParams();
+                        if (searchQuery.value) params.append('q', searchQuery.value);
+                        if (filterCategory.value) params.append('category_id', filterCategory.value);
+                        if (filterTag.value) params.append('tag_id', filterTag.value);
+                        
+                        const res = await fetch(`/blog/visitor/posts?${params.toString()}`);
+                        const data = await res.json();
+                        // 修正
+                        posts.value = data.posts || [];
+                    } catch (err) {
+                        console.error('Failed to fetch posts:', err);
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+
+                const fetchCategories = async () => {
+                    try {
+                        const res = await fetch('/blog/visitor/categories');
+                        const data = await res.json();
+                        // 修正
+                        categories.value = data || [];
+                    } catch (err) {
+                        console.error('Failed to fetch categories:', err);
+                    }
+                };
+
+                const fetchTags = async () => {
+                    try {
+                        const res = await fetch('/blog/visitor/tags');
+                        const data = await res.json();
+                        // 修正
+                        tags.value = data || [];
+                    } catch (err) {
+                        console.error('Failed to fetch tags:', err);
+                    }
+                };
+
+                const formatDate = (dateStr) => {
+                    if (!dateStr) return '';
+                    const date = new Date(dateStr);
+                    return date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+                };
+
+                const getCategoryName = (id) => {
+                    const cat = categories.value.find(c => c.id === id);
+                    return cat ? cat.name : '加载中...';
+                };
+
+                const filterByCategory = (id) => {
+                    if (!id) return;
+                    filterCategory.value = id;
+                    filterTag.value = null;
+                    fetchPosts();
+                };
+
+                const filterByTag = (tag) => {
+                    if (!tag) return;
+                    // tag 这里可能是对象或者 ID
+                    filterTag.value = tag.id || tag;
+                    filterCategory.value = null;
+                    fetchPosts();
+                };
+
+                const resetFilter = () => {
+                    searchQuery.value = '';
+                    filterCategory.value = null;
+                    filterTag.value = null;
+                    fetchPosts();
+                };
+
+                const scrollToSection = (id) => {
+                    const el = document.getElementById(id + '-title');
+                    if (el) {
+                        el.scrollIntoView({ behavior: 'smooth' });
+                    }
+                };
+
+                const viewPost = (post) => {
+                    window.location.href = `/blog/visitor/post/${post.slug || post.id}/page`;
+                };
+
+                onMounted(() => {
+                    // 检查 URL 参数
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const catId = urlParams.get('category_id');
+                    const tagId = urlParams.get('tag_id');
+                    
+                    if (catId) filterCategory.value = catId;
+                    if (tagId) filterTag.value = tagId;
+
+                    fetchPosts();
+                    fetchCategories();
+                    fetchTags();
+                });
+
+                return {
+                    posts, categories, tags, loading, selectedPost,
+                    searchQuery, filterCategory, filterTag,
+                    fetchPosts, filterByCategory, filterByTag, resetFilter, viewPost, formatDate,
+                    scrollToSection, getCategoryName
+                };
             }
-        }
-        fetchPosts();
+        }).mount('#app');
     </script>
 </body>
 </html>

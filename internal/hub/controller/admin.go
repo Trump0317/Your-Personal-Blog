@@ -1,4 +1,4 @@
-package admin
+package controller
 
 import (
 	"net/http"
@@ -14,6 +14,16 @@ type AdminController struct {
 func NewAdminController(adminUC usercase.Admin) *AdminController {
 	return &AdminController{
 		adminUC: adminUC,
+	}
+}
+
+func NewAdminRouter(group *gin.RouterGroup, adminUC usercase.Admin) {
+	handler := NewAdminController(adminUC)
+
+	adminGroup := group.Group("/admin")
+	adminGroup.Use(AdminAuthMiddleware(adminUC))
+	{
+		adminGroup.GET("/stats", handler.GetStats)
 	}
 }
 

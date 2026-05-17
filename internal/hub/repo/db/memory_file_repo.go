@@ -48,17 +48,28 @@ func (r *MemoryFileRepo) GetByID(ctx context.Context, id string) (*model.File, e
 	return file, nil
 }
 
-func (r *MemoryFileRepo) ListByUser(ctx context.Context, userID string) ([]*model.File, error) {
+func (r *MemoryFileRepo) ListByUser(ctx context.Context, userID string, limit, offset int) ([]*model.File, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
 	var result []*model.File
 	for _, f := range r.files {
-		if f.UploaderID == userID {
+		if f.Uploader == userID {
 			result = append(result, f)
 		}
 	}
-	return result, nil
+
+	// 简单的内存分页
+	if offset >= len(result) {
+		return []*model.File{}, nil
+	}
+
+	end := offset + limit
+	if end > len(result) || limit <= 0 {
+		end = len(result)
+	}
+
+	return result[offset:end], nil
 }
 
 func (r *MemoryFileRepo) Delete(ctx context.Context, id string) error {

@@ -23,46 +23,34 @@ func (r *MemoryUserRepo) Create(ctx context.Context, user model.User) (string, e
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.users[user.ID] = &user
-	return user.ID, nil
-}
-
-func (r *MemoryUserRepo) GetByID(ctx context.Context, id string) (*model.User, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	user, ok := r.users[id]
-	if !ok {
-		return nil, errors.New("user not found")
-	}
-	return user, nil
+	r.users[user.APIKey] = &user
+	return user.APIKey, nil
 }
 
 func (r *MemoryUserRepo) GetByAPIKey(ctx context.Context, apiKey string) (*model.User, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	for _, user := range r.users {
-		if user.APIKey == apiKey {
-			return user, nil
-		}
+	user, ok := r.users[apiKey]
+	if !ok {
+		return nil, errors.New("user not found by APIKey")
 	}
-	return nil, errors.New("user not found by APIKey")
+	return user, nil
 }
 
-func (r *MemoryUserRepo) Delete(ctx context.Context, id string) error {
+func (r *MemoryUserRepo) Delete(ctx context.Context, apiKey string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	delete(r.users, id)
+	delete(r.users, apiKey)
 	return nil
 }
 
-func (r *MemoryUserRepo) UpdateStatus(ctx context.Context, id string, status model.UserStatus) error {
+func (r *MemoryUserRepo) UpdateStatus(ctx context.Context, apiKey string, status model.UserStatus) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	user, ok := r.users[id]
+	user, ok := r.users[apiKey]
 	if !ok {
 		return errors.New("user not found")
 	}
