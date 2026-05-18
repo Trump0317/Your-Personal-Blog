@@ -47,7 +47,7 @@ func (ctrl *adminController) ListPosts(c *gin.Context) {
 			Slug:        p.Slug,
 			Status:      int(p.Status),
 			ViewCount:   p.ViewCount,
-			CategoryID:  p.ID, // 这里如果是 PostItem 应该有 Category
+			CategoryID:  p.Category.ID,
 			CreatedAt:   p.CreatedAt,
 			PublishedAt: p.PublishedAt,
 		})

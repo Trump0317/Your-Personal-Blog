@@ -11,28 +11,28 @@ type Response struct {
 
 // PostItemResponse 访客端：文章列表条目
 type PostItemResponse struct {
-	ID          string           `json:"id"`
-	Title       string           `json:"title"`
-	Slug        string           `json:"slug"`
-	Summary     string           `json:"summary"`
-	ViewCount   int              `json:"view_count"`
-	Category    *CategoryBenefit `json:"category,omitempty"`
-	Tags        []TagBenefit     `json:"tags,omitempty"`
-	PublishedAt *time.Time       `json:"published_at"`
+	ID          string         `json:"id"`
+	Title       string         `json:"title"`
+	Slug        string         `json:"slug"`
+	Summary     string         `json:"summary"`
+	ViewCount   int            `json:"view_count"`
+	Category    *CategoryBrief `json:"category,omitempty"`
+	Tags        []TagBrief     `json:"tags,omitempty"`
+	PublishedAt *time.Time     `json:"published_at"`
 }
 
 // PostDetailResponse 访客端：文章详情响应
 type PostDetailResponse struct {
-	ID          string           `json:"id"`
-	Title       string           `json:"title"`
-	Slug        string           `json:"slug"`
-	Content     string           `json:"content"`      // Markdown 原文
-	HTMLContent string           `json:"html_content"` // 渲染后的 HTML
-	Summary     string           `json:"summary"`
-	ViewCount   int              `json:"view_count"`
-	Category    *CategoryBenefit `json:"category,omitempty"`
-	Tags        []TagBenefit     `json:"tags,omitempty"`
-	PublishedAt *time.Time       `json:"published_at"`
+	ID          string         `json:"id"`
+	Title       string         `json:"title"`
+	Slug        string         `json:"slug"`
+	Content     string         `json:"content"`      // Markdown 原文
+	HTMLContent string         `json:"html_content"` // 渲染后的 HTML
+	Summary     string         `json:"summary"`
+	ViewCount   int            `json:"view_count"`
+	Category    *CategoryBrief `json:"category,omitempty"`
+	Tags        []TagBrief     `json:"tags,omitempty"`
+	PublishedAt *time.Time     `json:"published_at"`
 }
 
 // PostListResponse 访客端：文章列表分页响应
@@ -41,15 +41,15 @@ type PostListResponse struct {
 	Items []*PostItemResponse `json:"items"`
 }
 
-// CategoryBenefit 简化的分类信息
-type CategoryBenefit struct {
+// CategoryBrief 简化的分类信息
+type CategoryBrief struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	Slug string `json:"slug"`
 }
 
-// TagBenefit 简化的标签信息
-type TagBenefit struct {
+// TagBrief 简化的标签信息
+type TagBrief struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	Slug string `json:"slug"`

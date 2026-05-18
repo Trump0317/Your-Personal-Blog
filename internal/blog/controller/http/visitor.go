@@ -75,18 +75,18 @@ func (vc *visitorController) GetPost(c *gin.Context) {
 		return
 	}
 
-	tags := make([]TagBenefit, 0)
+	tags := make([]TagBrief, 0)
 	for _, t := range post.Tags {
-		tags = append(tags, TagBenefit{
+		tags = append(tags, TagBrief{
 			ID:   t.ID,
 			Name: t.Name,
 			Slug: t.Slug,
 		})
 	}
 
-	var cat *CategoryBenefit
+	var cat *CategoryBrief
 	if post.Category != nil {
-		cat = &CategoryBenefit{
+		cat = &CategoryBrief{
 			ID:   post.Category.ID,
 			Name: post.Category.Name,
 			Slug: post.Category.Slug,
@@ -147,18 +147,18 @@ func (vc *visitorController) ListPosts(c *gin.Context) {
 
 	items := make([]*PostItemResponse, 0)
 	for _, p := range output.Posts {
-		tags := make([]TagBenefit, 0)
+		tags := make([]TagBrief, 0)
 		for _, t := range p.Tags {
-			tags = append(tags, TagBenefit{
+			tags = append(tags, TagBrief{
 				ID:   t.ID,
 				Name: t.Name,
 				Slug: t.Slug,
 			})
 		}
 
-		var cat *CategoryBenefit
+		var cat *CategoryBrief
 		if p.Category != nil {
-			cat = &CategoryBenefit{
+			cat = &CategoryBrief{
 				ID:   p.Category.ID,
 				Name: p.Category.Name,
 				Slug: p.Category.Slug,
@@ -195,9 +195,9 @@ func (vc *visitorController) ListTags(c *gin.Context) {
 		return
 	}
 
-	res := make([]TagBenefit, 0)
+	res := make([]TagBrief, 0)
 	for _, t := range tags {
-		res = append(res, TagBenefit{
+		res = append(res, TagBrief{
 			ID:   t.ID,
 			Name: t.Name,
 			Slug: t.Slug,
@@ -215,9 +215,9 @@ func (vc *visitorController) ListCategories(c *gin.Context) {
 		return
 	}
 
-	res := make([]CategoryBenefit, 0)
+	res := make([]CategoryBrief, 0)
 	for _, cat := range categories {
-		res = append(res, CategoryBenefit{
+		res = append(res, CategoryBrief{
 			ID:   cat.ID,
 			Name: cat.Name,
 			Slug: cat.Slug,
