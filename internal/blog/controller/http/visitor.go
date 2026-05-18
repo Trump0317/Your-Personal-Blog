@@ -2,7 +2,6 @@ package http
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ypb/your-personal-blog/internal/blog/model"
@@ -66,139 +65,164 @@ func (vc *visitorController) ArchivesPage(c *gin.Context) {
 func (vc *visitorController) GetPost(c *gin.Context) {
 	idOrSlug := c.Param("idOrSlug")
 	if idOrSlug == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		c.JSON(http.StatusBadRequest, Response{Code: http.StatusBadRequest, Message: "参数错误"})
 		return
 	}
 
 	post, err := vc.postUC.Get(c.Request.Context(), idOrSlug)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "文章不存在"})
+		c.JSON(http.StatusNotFound, Response{Code: http.StatusNotFound, Message: "文章不存在"})
 		return
 	}
 
-	// 在 Controller 层聚合数据
-	var category *model.Category
-	if post.CategoryID != "" {
-		category, _ = vc.categoryUC.Get(c.Request.Context(), post.CategoryID)
+	tags := make([]TagBenefit, 0)
+	for _, t := range post.Tags {
+		tags = append(tags, TagBenefit{
+			ID:   t.ID,
+			Name: t.Name,
+			Slug: t.Slug,
+		})
 	}
 
-	var tags []*model.Tag
-	if len(post.TagIDs) > 0 {
-		tags, _ = vc.tagUC.ListByIDs(c.Request.Context(), post.TagIDs)
+	var cat *CategoryBenefit
+	if post.Category != nil {
+		cat = &CategoryBenefit{
+			ID:   post.Category.ID,
+			Name: post.Category.Name,
+			Slug: post.Category.Slug,
+		}
 	}
 
-	output := &usecase.PostDetailOutput{
+	res := PostDetailResponse{
 		ID:          post.ID,
 		Title:       post.Title,
 		Slug:        post.Slug,
 		Content:     post.Content,
 		HTMLContent: post.HTMLContent,
 		Summary:     post.Summary,
-		Status:      post.Status,
 		ViewCount:   post.ViewCount,
-		CategoryID:  post.CategoryID,
-		Category:    category,
-		Tags:        tagsToValueSlice(tags),
-		CreatedAt:   post.CreatedAt,
-		UpdatedAt:   post.UpdatedAt,
+		Category:    cat,
+		Tags:        tags,
 		PublishedAt: post.PublishedAt,
 	}
 
-	c.JSON(http.StatusOK, output)
+	c.JSON(http.StatusOK, Response{Code: 0, Message: "success", Data: res})
 }
 
 // ListPosts API：返回文章列表数据 (JSON)
 func (vc *visitorController) ListPosts(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
-
-	status := model.PostPublished
-	in := &usecase.PostListInput{
-		Page:     page,
-		PageSize: pageSize,
-		Status:   &status, // 仅展示已发布的文章
-	}
-
-	// 增加按分类或标签过滤的支持
-	catID := c.Query("category_id")
-	if catID != "" {
-		in.CategoryID = &catID
-	}
-	tagID := c.Query("tag_id")
-	if tagID != "" {
-		in.TagID = &tagID
-	}
-	query := c.Query("q")
-	if query != "" {
-		in.Query = query
-	}
-
-	posts, total, err := vc.postUC.List(c.Request.Context(), in)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取文章失败"})
+	var req PostListRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.JSON(http.StatusBadRequest, Response{Code: http.StatusBadRequest, Message: "参数错误"})
 		return
 	}
 
-	// 在 Controller 层聚合数据
-	items := make([]*usecase.PostItem, 0, len(posts))
-	for _, p := range posts {
-		var category *model.Category
-		if p.CategoryID != "" {
-			category, _ = vc.categoryUC.Get(c.Request.Context(), p.CategoryID)
+	if req.Page <= 0 {
+		req.Page = 1
+	}
+	if req.PageSize <= 0 {
+		req.PageSize = 10
+	}
+
+	status := model.PostPublished
+	in := &usecase.PostListInput{
+		Page:     req.Page,
+		PageSize: req.PageSize,
+		Status:   &status,
+		Query:    req.Query,
+	}
+
+	if req.CategoryID != "" {
+		in.CategoryID = &req.CategoryID
+	}
+	if req.TagID != "" {
+		in.TagID = &req.TagID
+	}
+
+	output, err := vc.postUC.List(c.Request.Context(), in)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, Response{Code: http.StatusInternalServerError, Message: "获取文章失败"})
+		return
+	}
+
+	items := make([]*PostItemResponse, 0)
+	for _, p := range output.Posts {
+		tags := make([]TagBenefit, 0)
+		for _, t := range p.Tags {
+			tags = append(tags, TagBenefit{
+				ID:   t.ID,
+				Name: t.Name,
+				Slug: t.Slug,
+			})
 		}
 
-		var tags []*model.Tag
-		if len(p.TagIDs) > 0 {
-			tags, _ = vc.tagUC.ListByIDs(c.Request.Context(), p.TagIDs)
+		var cat *CategoryBenefit
+		if p.Category != nil {
+			cat = &CategoryBenefit{
+				ID:   p.Category.ID,
+				Name: p.Category.Name,
+				Slug: p.Category.Slug,
+			}
 		}
 
-		items = append(items, &usecase.PostItem{
+		items = append(items, &PostItemResponse{
 			ID:          p.ID,
 			Title:       p.Title,
 			Slug:        p.Slug,
 			Summary:     p.Summary,
-			Status:      p.Status,
 			ViewCount:   p.ViewCount,
-			Category:    category,
-			Tags:        tagsToValueSlice(tags),
-			CreatedAt:   p.CreatedAt,
+			Category:    cat,
+			Tags:        tags,
 			PublishedAt: p.PublishedAt,
 		})
 	}
 
-	c.JSON(http.StatusOK, usecase.PostListOutput{
-		Posts: items,
-		Total: total,
+	c.JSON(http.StatusOK, Response{
+		Code:    0,
+		Message: "success",
+		Data: PostListResponse{
+			Total: output.Total,
+			Items: items,
+		},
 	})
-}
-
-// 辅助函数：将对象切片转为模型中的非指针切片
-func tagsToValueSlice(tags []*model.Tag) []model.Tag {
-	res := make([]model.Tag, 0, len(tags))
-	for _, t := range tags {
-		if t != nil {
-			res = append(res, *t)
-		}
-	}
-	return res
 }
 
 // ListTags API：返回所有标签供展示
 func (vc *visitorController) ListTags(c *gin.Context) {
 	tags, err := vc.tagUC.List(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取标签失败"})
+		c.JSON(http.StatusInternalServerError, Response{Code: http.StatusInternalServerError, Message: "获取标签失败"})
 		return
 	}
-	c.JSON(http.StatusOK, tags)
+
+	res := make([]TagBenefit, 0)
+	for _, t := range tags {
+		res = append(res, TagBenefit{
+			ID:   t.ID,
+			Name: t.Name,
+			Slug: t.Slug,
+		})
+	}
+
+	c.JSON(http.StatusOK, Response{Code: 0, Message: "success", Data: res})
 }
 
 // ListCategories API：返回所有分类供展示
 func (vc *visitorController) ListCategories(c *gin.Context) {
 	categories, err := vc.categoryUC.List(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取分类失败"})
+		c.JSON(http.StatusInternalServerError, Response{Code: http.StatusInternalServerError, Message: "获取分类失败"})
 		return
 	}
-	c.JSON(http.StatusOK, categories)
+
+	res := make([]CategoryBenefit, 0)
+	for _, cat := range categories {
+		res = append(res, CategoryBenefit{
+			ID:   cat.ID,
+			Name: cat.Name,
+			Slug: cat.Slug,
+		})
+	}
+
+	c.JSON(http.StatusOK, Response{Code: 0, Message: "success", Data: res})
 }

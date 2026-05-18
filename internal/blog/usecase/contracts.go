@@ -15,8 +15,8 @@ type Post interface {
 	Unpublish(ctx context.Context, id string) error
 
 	// 展示端 & 列表分页接口
-	Get(ctx context.Context, idOrSlug string) (*model.Post, error)
-	List(ctx context.Context, in *PostListInput) ([]*model.Post, int64, error)
+	Get(ctx context.Context, idOrSlug string) (*PostDetailOutput, error)
+	List(ctx context.Context, in *PostListInput) (*PostListOutput, error)
 }
 
 // Category 分类业务接口

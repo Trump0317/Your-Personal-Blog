@@ -25,50 +25,41 @@ func NewAdminController(p usecase.Post, c usecase.Category, t usecase.Tag, cfg *
 	}
 }
 
-// ListPosts 列出所有文章
+// ListPosts 列出所有文章（含草稿）
 func (ctrl *adminController) ListPosts(c *gin.Context) {
 	var input usecase.PostListInput
 	if err := c.ShouldBindQuery(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, Response{Code: http.StatusBadRequest, Message: err.Error()})
 		return
 	}
 
-	posts, total, err := ctrl.postUC.List(c.Request.Context(), &input)
+	output, err := ctrl.postUC.List(c.Request.Context(), &input)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, Response{Code: http.StatusInternalServerError, Message: err.Error()})
 		return
 	}
 
-	// 在 Controller 层聚合数据
-	items := make([]*usecase.PostItem, 0, len(posts))
-	for _, p := range posts {
-		var category *model.Category
-		if p.CategoryID != "" {
-			category, _ = ctrl.categoryUC.Get(c.Request.Context(), p.CategoryID)
-		}
-
-		var tags []*model.Tag
-		if len(p.TagIDs) > 0 {
-			tags, _ = ctrl.tagUC.ListByIDs(c.Request.Context(), p.TagIDs)
-		}
-
-		items = append(items, &usecase.PostItem{
+	items := make([]*PostAdminItemResponse, 0)
+	for _, p := range output.Posts {
+		items = append(items, &PostAdminItemResponse{
 			ID:          p.ID,
 			Title:       p.Title,
 			Slug:        p.Slug,
-			Summary:     p.Summary,
-			Status:      p.Status,
+			Status:      int(p.Status),
 			ViewCount:   p.ViewCount,
-			Category:    category,
-			Tags:        tagsToValueSlice(tags),
+			CategoryID:  p.ID, // 这里如果是 PostItem 应该有 Category
 			CreatedAt:   p.CreatedAt,
 			PublishedAt: p.PublishedAt,
 		})
 	}
 
-	c.JSON(http.StatusOK, usecase.PostListOutput{
-		Posts: items,
-		Total: total,
+	c.JSON(http.StatusOK, Response{
+		Code:    0,
+		Message: "success",
+		Data: gin.H{
+			"total": output.Total,
+			"items": items,
+		},
 	})
 }
 
@@ -84,42 +75,30 @@ func (ctrl *adminController) LoginGUI(c *gin.Context) {
 
 // Login 登录接口 (手动验证账号密码)
 func (ctrl *adminController) Login(c *gin.Context) {
-	var body struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-	}
-	if err := c.ShouldBindJSON(&body); err == nil {
-		if body.Username == ctrl.cfg.Admin.Username && body.Password == ctrl.cfg.Admin.Password {
-			c.JSON(http.StatusOK, gin.H{"message": "Login successful"})
+	var req LoginRequest
+	if err := c.ShouldBindJSON(&req); err == nil {
+		if req.Username == ctrl.cfg.Admin.Username && req.Password == ctrl.cfg.Admin.Password {
+			c.JSON(http.StatusOK, Response{Code: 0, Message: "Login successful"})
 			return
 		}
 	}
 
 	user, pwd, ok := c.Request.BasicAuth()
 	if ok && user == ctrl.cfg.Admin.Username && pwd == ctrl.cfg.Admin.Password {
-		c.JSON(http.StatusOK, gin.H{"message": "Login successful"})
+		c.JSON(http.StatusOK, Response{Code: 0, Message: "Login successful"})
 		return
 	}
 
 	c.Header("WWW-Authenticate", `Basic realm="Restricted"`)
-	c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+	c.JSON(http.StatusUnauthorized, Response{Code: http.StatusUnauthorized, Message: "Unauthorized"})
 }
 
 // CreatePost 创建文章
 func (ctrl *adminController) CreatePost(c *gin.Context) {
-	var body struct {
-		Title       string   `json:"title"`
-		Slug        string   `json:"slug"`
-		Content     string   `json:"content"`
-		Summary     string   `json:"summary"`
-		CategoryID  string   `json:"category_id"`
-		Status      string   `json:"status"` // 接收字符串
-		TagIDs      []string `json:"tag_ids"`
-		NewTagNames []string `json:"new_tag_names"`
-	}
+	var body CreatePostRequest
 
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "details": "binding error"})
+		c.JSON(http.StatusBadRequest, Response{Code: http.StatusBadRequest, Message: err.Error()})
 		return
 	}
 
@@ -128,7 +107,7 @@ func (ctrl *adminController) CreatePost(c *gin.Context) {
 	if len(body.NewTagNames) > 0 {
 		ids, err := ctrl.tagUC.GetOrCreates(c.Request.Context(), body.NewTagNames)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to process tags"})
+			c.JSON(http.StatusInternalServerError, Response{Code: http.StatusInternalServerError, Message: "failed to process tags"})
 			return
 		}
 		finalTagIDs = ids
@@ -167,27 +146,18 @@ func (ctrl *adminController) CreatePost(c *gin.Context) {
 
 	id, err := ctrl.postUC.Create(c.Request.Context(), &input)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, Response{Code: http.StatusInternalServerError, Message: err.Error()})
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"id": id})
+	c.JSON(http.StatusCreated, Response{Code: 0, Message: "success", Data: gin.H{"id": id}})
 }
 
 // UpdatePost 更新文章
 func (ctrl *adminController) UpdatePost(c *gin.Context) {
-	var body struct {
-		Title       *string  `json:"title"`
-		Slug        *string  `json:"slug"`
-		Content     *string  `json:"content"`
-		Summary     *string  `json:"summary"`
-		CategoryID  *string  `json:"category_id"`
-		Status      *string  `json:"status"`
-		TagIDs      []string `json:"tag_ids"`
-		NewTagNames []string `json:"new_tag_names"`
-	}
+	var body UpdatePostRequest
 
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, Response{Code: http.StatusBadRequest, Message: err.Error()})
 		return
 	}
 
@@ -195,7 +165,7 @@ func (ctrl *adminController) UpdatePost(c *gin.Context) {
 	if len(body.NewTagNames) > 0 {
 		ids, err := ctrl.tagUC.GetOrCreates(c.Request.Context(), body.NewTagNames)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to process tags"})
+			c.JSON(http.StatusInternalServerError, Response{Code: http.StatusInternalServerError, Message: "failed to process tags"})
 			return
 		}
 		finalTagIDs = ids
@@ -224,7 +194,7 @@ func (ctrl *adminController) UpdatePost(c *gin.Context) {
 		CategoryID: body.CategoryID,
 	}
 
-	if len(finalTagIDs) > 0 || len(body.TagIDs) > 0 {
+	if len(finalTagIDs) > 0 {
 		input.TagIDs = &finalTagIDs
 	}
 
@@ -240,38 +210,38 @@ func (ctrl *adminController) UpdatePost(c *gin.Context) {
 	}
 
 	if err := ctrl.postUC.Update(c.Request.Context(), &input); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, Response{Code: http.StatusInternalServerError, Message: err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "updated"})
+	c.JSON(http.StatusOK, Response{Code: 0, Message: "updated"})
 }
 
 // DeletePost 删除文章
 func (ctrl *adminController) DeletePost(c *gin.Context) {
 	id := c.Param("id")
 	if err := ctrl.postUC.Delete(c.Request.Context(), id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, Response{Code: http.StatusInternalServerError, Message: err.Error()})
 		return
 	}
-	c.JSON(http.StatusNoContent, nil)
+	c.JSON(http.StatusOK, Response{Code: 0, Message: "deleted"})
 }
 
 // ListCategories 获取全量分类
 func (ctrl *adminController) ListCategories(c *gin.Context) {
 	cats, err := ctrl.categoryUC.List(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, Response{Code: http.StatusInternalServerError, Message: err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, cats)
+	c.JSON(http.StatusOK, Response{Code: 0, Message: "success", Data: cats})
 }
 
 // ListTags 获取全量标签
 func (ctrl *adminController) ListTags(c *gin.Context) {
 	tags, err := ctrl.tagUC.List(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, Response{Code: http.StatusInternalServerError, Message: err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, tags)
+	c.JSON(http.StatusOK, Response{Code: 0, Message: "success", Data: tags})
 }

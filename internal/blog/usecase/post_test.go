@@ -125,9 +125,10 @@ func (m *MockCategoryRepo) Delete(ctx context.Context, id string) error {
 
 func TestPostUsecase_Create(t *testing.T) {
 	mockRepo := new(MockPostRepo)
+	mockTagUC := new(MockTagUsecase)
 	mockCatRepo := new(MockCategoryRepo)
 
-	tuc := NewPostUsecase(mockRepo, mockCatRepo)
+	tuc := NewPostUsecase(mockRepo, mockCatRepo, mockTagUC)
 
 	t.Run("成功创建文章并关联标签", func(t *testing.T) {
 		ctx := context.Background()
@@ -159,10 +160,11 @@ func TestPostUsecase_Create(t *testing.T) {
 
 func TestPostUsecase_Get(t *testing.T) {
 	mockRepo := new(MockPostRepo)
+	mockTagUC := new(MockTagUsecase)
 	mockCatRepo := new(MockCategoryRepo)
-	tuc := NewPostUsecase(mockRepo, mockCatRepo)
+	tuc := NewPostUsecase(mockRepo, mockCatRepo, mockTagUC)
 
-	t.Run("成功获取文章详情", func(t *testing.T) {
+	t.Run("成功获取文章详情并填充关联项", func(t *testing.T) {
 		ctx := context.Background()
 		postID := "post_1"
 		mockPost := &model.Post{
@@ -174,10 +176,17 @@ func TestPostUsecase_Get(t *testing.T) {
 
 		mockRepo.On("GetBySlug", ctx, postID).Return((*model.Post)(nil), assert.AnError)
 		mockRepo.On("GetByID", ctx, postID).Return(mockPost, nil)
+		mockCatRepo.On("GetByID", ctx, "cat_1").Return(&model.Category{ID: "cat_1", Name: "分类1"}, nil)
+		mockTagUC.On("ListByIDs", ctx, mockPost.TagIDs).Return([]*model.Tag{
+			{ID: "tag_1", Name: "标签1"},
+			{ID: "tag_2", Name: "标签2"},
+		}, nil)
 
 		out, err := tuc.Get(ctx, postID)
 		assert.NoError(t, err)
 		assert.Equal(t, "测试文章", out.Title)
+		assert.Equal(t, "分类1", out.Category.Name)
+		assert.Len(t, out.Tags, 2)
 	})
 }
 
