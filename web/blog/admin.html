@@ -13,8 +13,12 @@
         <!-- 导航栏 -->
         <header class="bg-white shadow px-6 py-4 flex justify-between items-center">
             <h1 class="text-xl font-bold text-gray-800">Your Blog Admin</h1>
-            <div class="flex items-center space-x-4">
-                <button @click="showList" class="text-gray-600 hover:text-blue-600">内容管理</button>
+            <div class="flex items-center space-x-6">
+                <nav class="flex space-x-4 mr-4 border-r pr-4">
+                    <button @click="showList" :class="view === 'list' ? 'text-blue-600 font-bold' : 'text-gray-600 hover:text-blue-600'">文章</button>
+                    <button @click="showCategories" :class="view === 'categories' ? 'text-blue-600 font-bold' : 'text-gray-600 hover:text-blue-600'">分类</button>
+                    <button @click="showTags" :class="view === 'tags' ? 'text-blue-600 font-bold' : 'text-gray-600 hover:text-blue-600'">标签</button>
+                </nav>
                 <button @click="openEditor()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">新文章</button>
                 <button @click="handleLogout" class="text-gray-400 hover:text-red-500">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -41,8 +45,8 @@
                             <td class="px-6 py-4 font-medium text-gray-900">{{ post.title }}</td>
                             <td class="px-6 py-4 text-sm text-gray-500">{{ post.category?.name || '-' }}</td>
                             <td class="px-6 py-4">
-                                <span :class="['px-2 py-1 rounded-full text-xs font-medium', post.status === 'published' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800']">
-                                    {{ post.status === 'published' ? '发布' : '草稿' }}
+                                <span :class="['px-2 py-1 rounded-full text-xs font-medium', post.status === 1 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800']">
+                                    {{ post.status === 1 ? '已发布' : '草稿' }}
                                 </span>
                             </td>
                             <td class="px-6 py-4 text-sm space-x-3">
@@ -52,6 +56,60 @@
                         </tr>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- 分类管理 -->
+            <div v-if="view === 'categories'" class="max-w-4xl mx-auto space-y-6">
+                <div class="bg-white rounded-xl shadow p-6">
+                    <h2 class="text-xl font-bold mb-4">添加/编辑分类</h2>
+                    <div class="grid grid-cols-3 gap-4">
+                        <input type="text" v-model="catForm.name" placeholder="分类名称" class="border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-400">
+                        <input type="text" v-model="catForm.slug" placeholder="Slug (URL别名)" class="border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-400">
+                        <button @click="saveCategory" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+                            {{ catForm.id ? '更新分类' : '添加分类' }}
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow overflow-hidden">
+                    <table class="w-full text-left">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-6 py-3 text-sm font-semibold text-gray-600">名称</th>
+                                <th class="px-6 py-3 text-sm font-semibold text-gray-600">Slug</th>
+                                <th class="px-6 py-3 text-sm font-semibold text-gray-600">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y">
+                            <tr v-for="cat in categories" :key="cat.id" class="hover:bg-gray-50">
+                                <td class="px-6 py-4">{{ cat.name }}</td>
+                                <td class="px-6 py-4 text-gray-500">{{ cat.slug || '-' }}</td>
+                                <td class="px-6 py-4 space-x-3">
+                                    <button @click="editCategory(cat)" class="text-blue-600 hover:underline">编辑</button>
+                                    <button @click="deleteCategory(cat.id)" class="text-red-500 hover:underline">删除</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 标签管理 -->
+            <div v-if="view === 'tags'" class="max-w-4xl mx-auto space-y-6">
+                <div class="bg-white rounded-xl shadow p-6">
+                    <h2 class="text-xl font-bold mb-4">添加标签</h2>
+                    <div class="flex space-x-4">
+                        <input type="text" v-model="newTagName" @keyup.enter="addTagFromPage" placeholder="新标签名称" class="flex-1 border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-400">
+                        <button @click="addTagFromPage" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">添加</button>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap gap-3">
+                    <div v-for="tag in tags" :key="tag.id" class="bg-white border rounded-full px-4 py-2 flex items-center space-x-2 shadow-sm hover:shadow-md transition">
+                        <span class="text-gray-700"># {{ tag.name }}</span>
+                        <button @click="deleteTag(tag.id)" class="text-gray-400 hover:text-red-500 text-lg">&times;</button>
+                    </div>
+                </div>
             </div>
 
             <!-- 编辑器 -->
@@ -81,8 +139,17 @@
                 </div>
 
                 <div class="space-y-2">
-                    <label class="block text-sm font-medium text-gray-700">标签 (逗号分隔)</label>
-                    <input type="text" v-model="tagInput" class="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none" placeholder="Go, 设计模式, 架构">
+                    <label class="block text-sm font-medium text-gray-700">标签</label>
+                    <div class="flex flex-wrap gap-2 mb-2">
+                        <label v-for="tag in tags" :key="tag.id" class="flex items-center px-3 py-1 bg-gray-100 rounded-full cursor-pointer hover:bg-gray-200 transition">
+                            <input type="checkbox" :value="tag.id" v-model="selectedTagIds" class="mr-2">
+                            <span class="text-sm text-gray-700">{{ tag.name }}</span>
+                        </label>
+                    </div>
+                    <div class="flex space-x-2">
+                        <input type="text" v-model="newTagName" @keyup.enter="addTag" class="flex-1 border rounded-lg px-3 py-1 text-sm focus:ring-2 focus:ring-blue-400 outline-none" placeholder="输入新标签名...">
+                        <button @click="addTag" class="px-3 py-1 bg-gray-600 text-white text-sm rounded-md hover:bg-gray-700">添加标签</button>
+                    </div>
                 </div>
 
                 <div class="space-y-2">
@@ -105,8 +172,11 @@
                 const view = ref('list');
                 const posts = ref([]);
                 const categories = ref([]);
-                const tagInput = ref('');
+                const tags = ref([]);
+                const selectedTagIds = ref([]);
+                const newTagName = ref('');
                 const form = ref({ id: null, title: '', slug: '', content: '', category_id: '', status: 'draft' });
+                const catForm = ref({ id: null, name: '', slug: '' });
 
                 const getAuth = () => localStorage.getItem('blog_admin_auth');
 
@@ -132,15 +202,43 @@
 
                 const fetchPosts = async () => {
                     const res = await secureFetch('/blog/admin/posts?page=1&page_size=100');
-                    if (!res) return;
+                    if (!res || !res.ok) return;
                     const data = await res.json();
-                    posts.value = data.posts || [];
+                    // 处理后端统一 Response 包装中的 Data.items
+                    posts.value = data.data?.items || data.posts || [];
                 };
 
                 const fetchMeta = async () => {
-                    const res = await secureFetch('/blog/admin/categories');
-                    if (!res) return;
-                    categories.value = await res.json();
+                    const [catRes, tagRes] = await Promise.all([
+                        secureFetch('/blog/admin/categories'),
+                        secureFetch('/blog/admin/tags')
+                    ]);
+                    if (catRes && catRes.ok) {
+                        const data = await catRes.json();
+                        categories.value = data.data || data; // 处理 Response 包装
+                    }
+                    if (tagRes && tagRes.ok) {
+                        const data = await tagRes.json();
+                        tags.value = data.data || data;
+                    }
+                };
+
+                const addTag = async () => {
+                    if (!newTagName.value.trim()) return;
+                    const res = await secureFetch('/blog/admin/tags', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: newTagName.value.trim() })
+                    });
+                    if (res && res.ok) {
+                        const data = await res.json();
+                        const newTag = data.data || data;
+                        tags.value.push(newTag);
+                        selectedTagIds.value.push(newTag.id);
+                        newTagName.value = '';
+                    } else {
+                        alert('添加标签失败');
+                    }
                 };
 
                 const showList = () => { view.value = 'list'; fetchPosts(); };
@@ -148,11 +246,12 @@
                 const openEditor = (post = null) => {
                     if (post) {
                         form.value = { ...post, category_id: post.category?.id || '' };
-                        tagInput.value = (post.tags || []).map(t => t.name).join(', ');
+                        selectedTagIds.value = (post.tags || []).map(t => t.id);
                     } else {
                         form.value = { id: null, title: '', slug: '', content: '', category_id: '', status: 'draft' };
-                        tagInput.value = '';
+                        selectedTagIds.value = [];
                     }
+                    newTagName.value = '';
                     view.value = 'edit';
                 };
 
@@ -168,7 +267,7 @@
                         summary: form.value.summary || '',
                         category_id: form.value.category_id,
                         status: status,
-                        new_tag_names: tagInput.value.split(',').map(s => s.trim()).filter(s => s)
+                        tag_ids: selectedTagIds.value
                     };
 
                     const res = await secureFetch(url, {
@@ -196,9 +295,61 @@
                     window.location.href = '/blog/admin/login';
                 };
 
+                // 分类管理逻辑
+                const showCategories = () => { view.value = 'categories'; fetchMeta(); };
+                const editCategory = (cat) => { catForm.value = { ...cat }; };
+                const saveCategory = async () => {
+                    if (!catForm.value.name) return alert('名称不能为空');
+                    const isEdit = !!catForm.value.id;
+                    const url = isEdit ? `/blog/admin/categories/${catForm.value.id}` : '/blog/admin/categories';
+                    const method = isEdit ? 'PUT' : 'POST';
+                    
+                    const res = await secureFetch(url, {
+                        method,
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(catForm.value)
+                    });
+                    if (res && res.ok) {
+                        catForm.value = { id: null, name: '', slug: '' };
+                        fetchMeta();
+                    } else {
+                        alert('保存失败');
+                    }
+                };
+                const deleteCategory = async (id) => {
+                    if (!confirm('确定删除此分类吗？这可能导致相关文章分类失效。')) return;
+                    const res = await secureFetch(`/blog/admin/categories/${id}`, { method: 'DELETE' });
+                    if (res && res.ok) fetchMeta();
+                };
+
+                // 标签管理逻辑
+                const showTags = () => { view.value = 'tags'; fetchMeta(); };
+                const addTagFromPage = async () => {
+                    if (!newTagName.value.trim()) return;
+                    const res = await secureFetch('/blog/admin/tags', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: newTagName.value.trim() })
+                    });
+                    if (res && res.ok) {
+                        newTagName.value = '';
+                        fetchMeta();
+                    }
+                };
+                const deleteTag = async (id) => {
+                    if (!confirm('确定删除此标签吗？')) return;
+                    const res = await secureFetch(`/blog/admin/tags/${id}`, { method: 'DELETE' });
+                    if (res && res.ok) fetchMeta();
+                };
+
                 onMounted(() => { fetchPosts(); fetchMeta(); });
 
-                return { view, posts, categories, form, tagInput, showList, openEditor, savePost, deletePost, handleLogout };
+                return { 
+                    view, posts, categories, tags, selectedTagIds, newTagName, form, catForm,
+                    showList, openEditor, savePost, deletePost, handleLogout, addTag, 
+                    showCategories, editCategory, saveCategory, deleteCategory,
+                    showTags, addTagFromPage, deleteTag
+                };
             }
         }).mount('#app');
     </script>

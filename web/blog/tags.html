@@ -56,7 +56,10 @@
                 const fetchTags = async () => {
                     try {
                         const res = await fetch('/blog/visitor/tags');
-                        tags.value = await res.json();
+                        const data = await res.json();
+                        tags.value = data.data || data || [];
+                    } catch (err) {
+                        console.error('Failed to fetch tags:', err);
                     } finally {
                         loading.value = false;
                     }

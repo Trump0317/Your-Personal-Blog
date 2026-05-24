@@ -33,7 +33,7 @@ func (ctrl *adminController) ListPosts(c *gin.Context) {
 		return
 	}
 
-	output, err := ctrl.postUC.List(c.Request.Context(), &input)
+	output, err := ctrl.postUC.ListBy(c.Request.Context(), &input)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, Response{Code: http.StatusInternalServerError, Message: err.Error()})
 		return
@@ -41,13 +41,32 @@ func (ctrl *adminController) ListPosts(c *gin.Context) {
 
 	items := make([]*PostAdminItemResponse, 0)
 	for _, p := range output.Posts {
+		var cat *CategoryBrief
+		if p.Category != nil {
+			cat = &CategoryBrief{
+				ID:   p.Category.ID,
+				Name: p.Category.Name,
+				Slug: p.Category.Slug,
+			}
+		}
+
+		tags := make([]TagBrief, 0)
+		for _, t := range p.Tags {
+			tags = append(tags, TagBrief{
+				ID:   t.ID,
+				Name: t.Name,
+				Slug: t.Slug,
+			})
+		}
+
 		items = append(items, &PostAdminItemResponse{
 			ID:          p.ID,
 			Title:       p.Title,
 			Slug:        p.Slug,
 			Status:      int(p.Status),
 			ViewCount:   p.ViewCount,
-			CategoryID:  p.Category.ID,
+			Category:    cat,
+			Tags:        tags,
 			CreatedAt:   p.CreatedAt,
 			PublishedAt: p.PublishedAt,
 		})
@@ -102,39 +121,13 @@ func (ctrl *adminController) CreatePost(c *gin.Context) {
 		return
 	}
 
-	// 在 Controller 层处理标签：将名称转换为 ID
-	var finalTagIDs []string
-	if len(body.NewTagNames) > 0 {
-		ids, err := ctrl.tagUC.GetOrCreates(c.Request.Context(), body.NewTagNames)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, Response{Code: http.StatusInternalServerError, Message: "failed to process tags"})
-			return
-		}
-		finalTagIDs = ids
-	}
-
-	// 合并已有 ID
-	if len(body.TagIDs) > 0 {
-		tagMap := make(map[string]struct{})
-		for _, id := range finalTagIDs {
-			tagMap[id] = struct{}{}
-		}
-		for _, id := range body.TagIDs {
-			tagMap[id] = struct{}{}
-		}
-		finalTagIDs = make([]string, 0, len(tagMap))
-		for id := range tagMap {
-			finalTagIDs = append(finalTagIDs, id)
-		}
-	}
-
 	input := usecase.PostCreateInput{
 		Title:      body.Title,
 		Slug:       body.Slug,
 		Content:    body.Content,
 		Summary:    body.Summary,
 		CategoryID: body.CategoryID,
-		TagIDs:     finalTagIDs,
+		TagIDs:     body.TagIDs,
 	}
 
 	switch body.Status {
@@ -161,30 +154,6 @@ func (ctrl *adminController) UpdatePost(c *gin.Context) {
 		return
 	}
 
-	var finalTagIDs []string
-	if len(body.NewTagNames) > 0 {
-		ids, err := ctrl.tagUC.GetOrCreates(c.Request.Context(), body.NewTagNames)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, Response{Code: http.StatusInternalServerError, Message: "failed to process tags"})
-			return
-		}
-		finalTagIDs = ids
-	}
-
-	if len(body.TagIDs) > 0 {
-		tagMap := make(map[string]struct{})
-		for _, id := range finalTagIDs {
-			tagMap[id] = struct{}{}
-		}
-		for _, id := range body.TagIDs {
-			tagMap[id] = struct{}{}
-		}
-		finalTagIDs = make([]string, 0, len(tagMap))
-		for id := range tagMap {
-			finalTagIDs = append(finalTagIDs, id)
-		}
-	}
-
 	input := usecase.PostUpdateInput{
 		ID:         c.Param("id"),
 		Title:      body.Title,
@@ -192,10 +161,7 @@ func (ctrl *adminController) UpdatePost(c *gin.Context) {
 		Content:    body.Content,
 		Summary:    body.Summary,
 		CategoryID: body.CategoryID,
-	}
-
-	if len(finalTagIDs) > 0 {
-		input.TagIDs = &finalTagIDs
+		TagIDs:     body.TagIDs,
 	}
 
 	if body.Status != nil {
@@ -236,6 +202,56 @@ func (ctrl *adminController) ListCategories(c *gin.Context) {
 	c.JSON(http.StatusOK, Response{Code: 0, Message: "success", Data: cats})
 }
 
+// CreateCategory 创建分类
+func (ctrl *adminController) CreateCategory(c *gin.Context) {
+	var req CreateCategoryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, Response{Code: http.StatusBadRequest, Message: err.Error()})
+		return
+	}
+
+	in := usecase.CategoryCreateInput{
+		Name: req.Name,
+		Slug: req.Slug,
+	}
+	id, err := ctrl.categoryUC.Create(c.Request.Context(), &in)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, Response{Code: http.StatusInternalServerError, Message: err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, Response{Code: 0, Message: "success", Data: gin.H{"id": id}})
+}
+
+// UpdateCategory 更新分类
+func (ctrl *adminController) UpdateCategory(c *gin.Context) {
+	var req UpdateCategoryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, Response{Code: http.StatusBadRequest, Message: err.Error()})
+		return
+	}
+
+	in := usecase.CategoryUpdateInput{
+		ID:   c.Param("id"),
+		Name: req.Name,
+		Slug: req.Slug,
+	}
+	if err := ctrl.categoryUC.Update(c.Request.Context(), &in); err != nil {
+		c.JSON(http.StatusInternalServerError, Response{Code: http.StatusInternalServerError, Message: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, Response{Code: 0, Message: "success"})
+}
+
+// DeleteCategory 删除分类
+func (ctrl *adminController) DeleteCategory(c *gin.Context) {
+	id := c.Param("id")
+	if err := ctrl.categoryUC.Delete(c.Request.Context(), id); err != nil {
+		c.JSON(http.StatusInternalServerError, Response{Code: http.StatusInternalServerError, Message: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, Response{Code: 0, Message: "success"})
+}
+
 // ListTags 获取全量标签
 func (ctrl *adminController) ListTags(c *gin.Context) {
 	tags, err := ctrl.tagUC.List(c.Request.Context())
@@ -244,4 +260,33 @@ func (ctrl *adminController) ListTags(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, Response{Code: 0, Message: "success", Data: tags})
+}
+
+// CreateTag 管理端：创建标签
+func (ctrl *adminController) CreateTag(c *gin.Context) {
+	var req CreateTagRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, Response{Code: http.StatusBadRequest, Message: err.Error()})
+		return
+	}
+
+	in := usecase.TagCreateInput{
+		Name: req.Name,
+		Slug: req.Slug,
+	}
+	if err := ctrl.tagUC.Create(c.Request.Context(), &in); err != nil {
+		c.JSON(http.StatusInternalServerError, Response{Code: http.StatusInternalServerError, Message: err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, Response{Code: 0, Message: "success", Data: in})
+}
+
+// DeleteTag 删除标签
+func (ctrl *adminController) DeleteTag(c *gin.Context) {
+	id := c.Param("id")
+	if err := ctrl.tagUC.Delete(c.Request.Context(), id); err != nil {
+		c.JSON(http.StatusInternalServerError, Response{Code: http.StatusInternalServerError, Message: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, Response{Code: 0, Message: "success"})
 }

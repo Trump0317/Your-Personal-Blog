@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>我的个人博客</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         [v-cloak] { display: none; }
         .line-clamp-2 {
@@ -96,22 +97,22 @@
                     <article v-for="post in posts" :key="post.id" class="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow border border-gray-100">
                         <div class="p-6">
                             <div class="flex items-center space-x-2 text-sm text-gray-500 mb-3">
-                                <span>{{ formatDate(post.created_at) || formatDate(post.published_at) }}</span>
+                                <span>{{ formatDate(post.published_at || post.created_at) }}</span>
                                 <span>•</span>
-                                <span @click="filterByCategory(post.category_id || (post.category && post.category.id))" 
+                                <span @click.stop="filterByCategory(post.category?.id)" 
                                       class="text-blue-600 bg-blue-50 px-2 py-0.5 rounded cursor-pointer hover:bg-blue-100">
-                                    {{ post.category_name || (post.category && post.category.name) || '未分类' }}
+                                    {{ post.category?.name || '未分类' }}
                                 </span>
                             </div>
                             <h2 @click="viewPost(post)" class="text-2xl font-bold mb-3 cursor-pointer hover:text-blue-600 transition-colors">
                                 {{ post.title }}
                             </h2>
-                            <p class="text-gray-600 mb-4 line-clamp-2 leading-relaxed">
-                                {{ post.summary || (post.content ? post.content.substring(0, 150) + '...' : '') }}
+                            <p @click="openModal(post)" class="text-gray-600 mb-4 line-clamp-2 leading-relaxed cursor-pointer hover:text-gray-900 transition-colors">
+                                {{ post.summary || '点击阅读全文...' }}
                             </p>
                             <div class="flex flex-wrap gap-2">
-                                <span v-for="tag in (post.tags || [])" :key="tag.id || tag" 
-                                      @click="filterByTag(tag.name || tag)"
+                                <span v-for="tag in (post.tags || [])" :key="tag.id" 
+                                      @click.stop="filterByTag(tag.name || tag)"
                                       class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded cursor-pointer hover:bg-gray-200 transition-colors">
                                     #{{ tag.name || tag }}
                                 </span>
@@ -131,27 +132,38 @@
                 <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
                 <div @click.stop class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
                     <div class="bg-white px-6 py-8 sm:p-10">
-                        <div class="flex justify-between items-start mb-6">
-                            <h2 class="text-3xl font-extrabold text-gray-900 leading-tight">{{ selectedPost.title }}</h2>
-                            <button @click="selectedPost = null" class="text-gray-400 hover:text-gray-600 p-2 transition-colors">
-                                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
+                        <div v-if="modalLoading" class="flex justify-center items-center py-20">
+                            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
                         </div>
-                        <div class="flex items-center space-x-4 text-sm text-gray-500 mb-8 pb-4 border-b">
-                            <span>发布于 {{ formatDate(selectedPost.created_at) || formatDate(selectedPost.published_at) }}</span>
-                            <span>•</span>
-                            <span class="text-blue-600 font-medium">{{ selectedPost.category_name || (selectedPost.category && selectedPost.category.name) }}</span>
-                        </div>
-                        <div class="prose max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap text-lg">
-                            {{ selectedPost.content }}
-                        </div>
-                        <div class="mt-10 flex flex-wrap gap-2 pt-6 border-t font-sm">
-                            <span v-for="tag in (selectedPost.tags || [])" :key="tag.id || tag" class="text-blue-600 bg-blue-50 px-3 py-1 rounded-full text-sm">
-                                #{{ tag.name || tag }}
-                            </span>
-                        </div>
+                        <template v-else>
+                            <div class="flex justify-between items-start mb-6">
+                                <h2 class="text-3xl font-extrabold text-gray-900 leading-tight">{{ selectedPost.title }}</h2>
+                                <button @click="selectedPost = null" class="text-gray-400 hover:text-gray-600 p-2 transition-colors">
+                                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="flex items-center space-x-4 text-sm text-gray-500 mb-8 pb-4 border-b">
+                                <span>发布于 {{ formatDate(selectedPost.published_at || selectedPost.created_at) }}</span>
+                                <span>•</span>
+                                <span class="text-blue-600 font-medium">{{ selectedPost.category?.name || '未分类' }}</span>
+                            </div>
+                            <div class="prose max-w-none text-gray-800 leading-relaxed text-lg" v-html="renderMarkdown(selectedPost.content)"></div>
+                            <div class="mt-10 flex flex-wrap gap-2 pt-6 border-t font-sm">
+                                <span v-for="tag in (selectedPost.tags || [])" :key="tag.id || tag" class="text-blue-600 bg-blue-50 px-3 py-1 rounded-full text-sm">
+                                    #{{ tag.name || tag }}
+                                </span>
+                            </div>
+                            <div class="mt-8 text-center">
+                                <button @click="viewPost(selectedPost)" class="inline-flex items-center text-blue-600 hover:text-blue-800 font-bold border-b-2 border-blue-600 pb-1">
+                                    查看完整详情页
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -173,10 +185,55 @@
                 const categories = ref([]);
                 const tags = ref([]);
                 const loading = ref(false);
+                const modalLoading = ref(false);
                 const selectedPost = ref(null);
                 const searchQuery = ref('');
                 const filterCategory = ref(null);
                 const filterTag = ref(null);
+
+                const renderMarkdown = (content) => {
+                    if (!content) return '';
+                    try {
+                        const strContent = String(content);
+                        if (typeof marked.parse === 'function') {
+                            const html = marked.parse(strContent);
+                            return typeof html === 'string' ? html : '内容渲染中...';
+                        }
+                        if (typeof marked === 'function') {
+                            return marked(strContent);
+                        }
+                        return strContent;
+                    } catch (e) {
+                        console.error('Markdown 渲染错误:', e);
+                        return String(content);
+                    }
+                };
+
+                const openModal = async (postItem) => {
+                    selectedPost.value = { 
+                        ...postItem, 
+                        content: postItem.content || '正在加载详细内容...' 
+                    };
+                    modalLoading.value = true;
+                    try {
+                        const idOrSlug = postItem.slug || postItem.id;
+                        const res = await fetch(`/blog/visitor/post/${idOrSlug}`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            const postDetail = data.data || data;
+                            if (postDetail) {
+                                selectedPost.value = postDetail;
+                            }
+                        } else {
+                            if (selectedPost.value) selectedPost.value.content = '无法加载文章内容，请稍后再试。';
+                        }
+                    } catch (e) {
+                        console.error('Fetch post detail failed:', e);
+                        if (selectedPost.value) selectedPost.value.content = '网络错误，无法加载内容。';
+                    } finally {
+                        modalLoading.value = false;
+                    }
+                };
 
                 const fetchPosts = async () => {
                     loading.value = true;
@@ -187,9 +244,10 @@
                         if (filterTag.value) params.append('tag_id', filterTag.value);
                         
                         const res = await fetch(`/blog/visitor/posts?${params.toString()}`);
+                        if (!res.ok) return;
                         const data = await res.json();
-                        // 修正
-                        posts.value = data.posts || [];
+                        // 处理后端统一 Response 包装中的 Data.items
+                        posts.value = data.data?.items || data.posts || [];
                     } catch (err) {
                         console.error('Failed to fetch posts:', err);
                     } finally {
@@ -200,9 +258,9 @@
                 const fetchCategories = async () => {
                     try {
                         const res = await fetch('/blog/visitor/categories');
+                        if (!res.ok) return;
                         const data = await res.json();
-                        // 修正
-                        categories.value = data || [];
+                        categories.value = data.data || data || [];
                     } catch (err) {
                         console.error('Failed to fetch categories:', err);
                     }
@@ -211,9 +269,9 @@
                 const fetchTags = async () => {
                     try {
                         const res = await fetch('/blog/visitor/tags');
+                        if (!res.ok) return;
                         const data = await res.json();
-                        // 修正
-                        tags.value = data || [];
+                        tags.value = data.data || data || [];
                     } catch (err) {
                         console.error('Failed to fetch tags:', err);
                     }
@@ -278,10 +336,10 @@
                 });
 
                 return {
-                    posts, categories, tags, loading, selectedPost,
+                    posts, categories, tags, loading, selectedPost, modalLoading,
                     searchQuery, filterCategory, filterTag,
                     fetchPosts, filterByCategory, filterByTag, resetFilter, viewPost, formatDate,
-                    scrollToSection, getCategoryName
+                    scrollToSection, getCategoryName, openModal, renderMarkdown
                 };
             }
         }).mount('#app');

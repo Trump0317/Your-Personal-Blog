@@ -139,7 +139,7 @@ func (vc *visitorController) ListPosts(c *gin.Context) {
 		in.TagID = &req.TagID
 	}
 
-	output, err := vc.postUC.List(c.Request.Context(), in)
+	output, err := vc.postUC.ListBy(c.Request.Context(), in)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, Response{Code: http.StatusInternalServerError, Message: "获取文章失败"})
 		return

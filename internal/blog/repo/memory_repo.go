@@ -5,9 +5,43 @@ import (
 	"errors"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ypb/your-personal-blog/internal/blog/model"
 )
+
+// Helper functions for deep copying models to prevent data races
+func copyPost(p *model.Post) *model.Post {
+	if p == nil {
+		return nil
+	}
+	cp := *p
+	if p.TagIDs != nil {
+		cp.TagIDs = make([]string, len(p.TagIDs))
+		copy(cp.TagIDs, p.TagIDs)
+	}
+	if p.PublishedAt != nil {
+		t := *p.PublishedAt
+		cp.PublishedAt = &t
+	}
+	return &cp
+}
+
+func copyCategory(c *model.Category) *model.Category {
+	if c == nil {
+		return nil
+	}
+	cc := *c
+	return &cc
+}
+
+func copyTag(t *model.Tag) *model.Tag {
+	if t == nil {
+		return nil
+	}
+	ct := *t
+	return &ct
+}
 
 // --- PostRepo Implementation ---
 
@@ -39,7 +73,7 @@ func (r *memoryPostRepo) GetByID(ctx context.Context, id string) (*model.Post, e
 	if !ok {
 		return nil, errors.New("post not found")
 	}
-	return post, nil
+	return copyPost(post), nil
 }
 
 func (r *memoryPostRepo) GetBySlug(ctx context.Context, slug string) (*model.Post, error) {
@@ -47,7 +81,7 @@ func (r *memoryPostRepo) GetBySlug(ctx context.Context, slug string) (*model.Pos
 	defer r.mu.RUnlock()
 	for _, p := range r.posts {
 		if p.Slug == slug {
-			return p, nil
+			return copyPost(p), nil
 		}
 	}
 	return nil, errors.New("post not found")
@@ -59,7 +93,8 @@ func (r *memoryPostRepo) Update(ctx context.Context, post *model.Post) error {
 	if _, ok := r.posts[post.ID]; !ok {
 		return errors.New("post not found")
 	}
-	r.posts[post.ID] = post
+	// 存储副本，防止外部修改影响 Repo 内部数据
+	r.posts[post.ID] = copyPost(post)
 	return nil
 }
 
@@ -77,11 +112,14 @@ func (r *memoryPostRepo) UpdateStatus(ctx context.Context, id string, status mod
 	if !ok {
 		return errors.New("post not found")
 	}
-	post.Status = status
-	if status == model.PostPublished && post.PublishedAt == nil {
-		now := post.UpdatedAt
-		post.PublishedAt = &now
+
+	newPost := *post
+	newPost.Status = status
+	if status == model.PostPublished && newPost.PublishedAt == nil {
+		now := time.Now()
+		newPost.PublishedAt = &now
 	}
+	r.posts[id] = &newPost
 	return nil
 }
 
@@ -92,7 +130,11 @@ func (r *memoryPostRepo) SetTags(ctx context.Context, postID string, tagIDs []st
 	if !ok {
 		return errors.New("post not found")
 	}
-	post.TagIDs = tagIDs
+
+	newPost := *post
+	newPost.TagIDs = make([]string, len(tagIDs))
+	copy(newPost.TagIDs, tagIDs)
+	r.posts[postID] = &newPost
 	return nil
 }
 
@@ -104,11 +146,6 @@ func (r *memoryPostRepo) List(ctx context.Context, filter *PostFilter) ([]*model
 	for _, p := range r.posts {
 		allPosts = append(allPosts, p)
 	}
-
-	// 调试日志：打印内存中所有文章的状态
-	// for _, p := range allPosts {
-	// 	fmt.Printf("Memory Repo List: ID=%s, Status=%v, PublishedAt=%v\n", p.ID, p.Status, p.PublishedAt)
-	// }
 
 	var filtered []*model.Post
 	for _, p := range allPosts {
@@ -137,7 +174,7 @@ func (r *memoryPostRepo) List(ctx context.Context, filter *PostFilter) ([]*model
 				}
 			}
 		}
-		filtered = append(filtered, p)
+		filtered = append(filtered, copyPost(p))
 	}
 
 	total := int64(len(filtered))
@@ -183,7 +220,7 @@ func (r *memoryCategoryRepo) Create(ctx context.Context, category *model.Categor
 	if _, ok := r.categories[category.ID]; ok {
 		return errors.New("category already exists")
 	}
-	r.categories[category.ID] = category
+	r.categories[category.ID] = copyCategory(category)
 	return nil
 }
 
@@ -194,7 +231,7 @@ func (r *memoryCategoryRepo) GetByID(ctx context.Context, id string) (*model.Cat
 	if !ok {
 		return nil, errors.New("category not found")
 	}
-	return cat, nil
+	return copyCategory(cat), nil
 }
 
 func (r *memoryCategoryRepo) GetBySlug(ctx context.Context, slug string) (*model.Category, error) {
@@ -202,7 +239,7 @@ func (r *memoryCategoryRepo) GetBySlug(ctx context.Context, slug string) (*model
 	defer r.mu.RUnlock()
 	for _, cat := range r.categories {
 		if cat.Slug == slug {
-			return cat, nil
+			return copyCategory(cat), nil
 		}
 	}
 	return nil, errors.New("category not found")
@@ -213,7 +250,7 @@ func (r *memoryCategoryRepo) List(ctx context.Context) ([]*model.Category, error
 	defer r.mu.RUnlock()
 	var list []*model.Category
 	for _, cat := range r.categories {
-		list = append(list, cat)
+		list = append(list, copyCategory(cat))
 	}
 	return list, nil
 }
@@ -224,7 +261,7 @@ func (r *memoryCategoryRepo) Update(ctx context.Context, category *model.Categor
 	if _, ok := r.categories[category.ID]; !ok {
 		return errors.New("category not found")
 	}
-	r.categories[category.ID] = category
+	r.categories[category.ID] = copyCategory(category)
 	return nil
 }
 
@@ -248,10 +285,13 @@ func NewMemoryTagRepo() TagRepo {
 	}
 }
 
-func (r *memoryTagRepo) Save(ctx context.Context, tag *model.Tag) error {
+func (r *memoryTagRepo) Create(ctx context.Context, tag *model.Tag) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.tags[tag.ID] = tag
+	if _, ok := r.tags[tag.ID]; ok {
+		return errors.New("tag already exists")
+	}
+	r.tags[tag.ID] = copyTag(tag)
 	return nil
 }
 
@@ -262,7 +302,7 @@ func (r *memoryTagRepo) GetByID(ctx context.Context, id string) (*model.Tag, err
 	if !ok {
 		return nil, errors.New("tag not found")
 	}
-	return tag, nil
+	return copyTag(tag), nil
 }
 
 func (r *memoryTagRepo) GetByName(ctx context.Context, name string) (*model.Tag, error) {
@@ -270,7 +310,7 @@ func (r *memoryTagRepo) GetByName(ctx context.Context, name string) (*model.Tag,
 	defer r.mu.RUnlock()
 	for _, tag := range r.tags {
 		if tag.Name == name {
-			return tag, nil
+			return copyTag(tag), nil
 		}
 	}
 	return nil, errors.New("tag not found")
@@ -281,7 +321,7 @@ func (r *memoryTagRepo) List(ctx context.Context) ([]*model.Tag, error) {
 	defer r.mu.RUnlock()
 	var list []*model.Tag
 	for _, tag := range r.tags {
-		list = append(list, tag)
+		list = append(list, copyTag(tag))
 	}
 	return list, nil
 }
@@ -292,7 +332,7 @@ func (r *memoryTagRepo) BatchGetByIDs(ctx context.Context, ids []string) ([]*mod
 	var list []*model.Tag
 	for _, id := range ids {
 		if tag, ok := r.tags[id]; ok {
-			list = append(list, tag)
+			list = append(list, copyTag(tag))
 		}
 	}
 	return list, nil

@@ -13,6 +13,14 @@ type MemoryUserRepo struct {
 	users map[string]*model.User
 }
 
+func copyUser(u *model.User) *model.User {
+	if u == nil {
+		return nil
+	}
+	cu := *u
+	return &cu
+}
+
 func NewMemoryUserRepo() *MemoryUserRepo {
 	return &MemoryUserRepo{
 		users: make(map[string]*model.User),
@@ -23,7 +31,7 @@ func (r *MemoryUserRepo) Create(ctx context.Context, user model.User) (string, e
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.users[user.APIKey] = &user
+	r.users[user.APIKey] = copyUser(&user)
 	return user.APIKey, nil
 }
 
@@ -35,7 +43,7 @@ func (r *MemoryUserRepo) GetByAPIKey(ctx context.Context, apiKey string) (*model
 	if !ok {
 		return nil, errors.New("user not found by APIKey")
 	}
-	return user, nil
+	return copyUser(user), nil
 }
 
 func (r *MemoryUserRepo) Delete(ctx context.Context, apiKey string) error {
@@ -54,6 +62,9 @@ func (r *MemoryUserRepo) UpdateStatus(ctx context.Context, apiKey string, status
 	if !ok {
 		return errors.New("user not found")
 	}
-	user.Status = status
+
+	newUser := *user
+	newUser.Status = status
+	r.users[apiKey] = &newUser
 	return nil
 }

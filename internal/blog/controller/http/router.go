@@ -45,7 +45,13 @@ func NewAdminRouter(group *gin.RouterGroup, admin *adminController) {
 
 	// 元数据列表 (用于下拉框/选择器)
 	group.GET("/categories", admin.ListCategories)
+	group.POST("/categories", admin.CreateCategory)
+	group.PUT("/categories/:id", admin.UpdateCategory)
+	group.DELETE("/categories/:id", admin.DeleteCategory)
+
 	group.GET("/tags", admin.ListTags)
+	group.POST("/tags", admin.CreateTag)
+	group.DELETE("/tags/:id", admin.DeleteTag)
 }
 
 /*

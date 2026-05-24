@@ -26,7 +26,7 @@ type PostDetailResponse struct {
 	ID          string         `json:"id"`
 	Title       string         `json:"title"`
 	Slug        string         `json:"slug"`
-	Content     string         `json:"content"`      // Markdown 原文
+	Content     string         `json:"content"`      // 原始内容 (Markdown)
 	HTMLContent string         `json:"html_content"` // 渲染后的 HTML
 	Summary     string         `json:"summary"`
 	ViewCount   int            `json:"view_count"`
@@ -73,13 +73,14 @@ type CategoryDetailResponse struct {
 
 // PostAdminItemResponse 管理端：文章列表条目
 type PostAdminItemResponse struct {
-	ID          string     `json:"id"`
-	Title       string     `json:"title"`
-	Slug        string     `json:"slug"`
-	Status      int        `json:"status"`
-	ViewCount   int        `json:"view_count"`
-	CategoryID  string     `json:"category_id"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-	PublishedAt *time.Time `json:"published_at"`
+	ID          string         `json:"id"`
+	Title       string         `json:"title"`
+	Slug        string         `json:"slug"`
+	Status      int            `json:"status"`
+	ViewCount   int            `json:"view_count"`
+	Category    *CategoryBrief `json:"category,omitempty"`
+	Tags        []TagBrief     `json:"tags,omitempty"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	PublishedAt *time.Time     `json:"published_at"`
 }

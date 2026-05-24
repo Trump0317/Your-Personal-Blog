@@ -45,7 +45,7 @@ type CategoryRepo interface {
 
 // TagRepo 标签字典接口：负责标签池的维护
 type TagRepo interface {
-	Save(ctx context.Context, tag *model.Tag) error
+	Create(ctx context.Context, tag *model.Tag) error
 	GetByID(ctx context.Context, id string) (*model.Tag, error)
 	GetByName(ctx context.Context, name string) (*model.Tag, error)
 	List(ctx context.Context) ([]*model.Tag, error)

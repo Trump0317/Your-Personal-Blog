@@ -31,3 +31,19 @@ type PostListInput struct {
 	TagID      *string           `json:"tag_id,omitempty"`
 	Query      string            `json:"query,omitempty"` // 搜索关键词
 }
+
+type TagCreateInput struct {
+	Name string `json:"name" validate:"required"`
+	Slug string `json:"slug" validate:"required,slug"`
+}
+
+type CategoryCreateInput struct {
+	Name string `json:"name" validate:"required"`
+	Slug string `json:"slug" validate:"required,slug"`
+}
+
+type CategoryUpdateInput struct {
+	ID   string `json:"id" validate:"required"`
+	Name string `json:"name,omitempty"`
+	Slug string `json:"slug,omitempty" validate:"omitempty,slug"`
+}

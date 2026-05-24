@@ -26,11 +26,23 @@ func NewPostUsecase(pr repo.PostRepo, cr repo.CategoryRepo, tu Tag) Post {
 
 func (u *postUsecase) Create(ctx context.Context, in *PostCreateInput) (string, error) {
 	// 1. 构造文章模型
+	summary := in.Summary
+	if summary == "" && len(in.Content) > 0 {
+		// 自动生成摘要
+		limit := 150
+		contentRune := []rune(in.Content)
+		if len(contentRune) > limit {
+			summary = string(contentRune[:limit]) + "..."
+		} else {
+			summary = in.Content
+		}
+	}
+
 	post := &model.Post{
 		ID:         fmt.Sprintf("post_%d", time.Now().UnixNano()), // 临时生成 ID
 		Title:      in.Title,
 		Slug:       in.Slug,
-		Summary:    in.Summary,
+		Summary:    summary,
 		Content:    in.Content,
 		CategoryID: in.CategoryID,
 		TagIDs:     in.TagIDs,
@@ -84,6 +96,15 @@ func (u *postUsecase) Update(ctx context.Context, in *PostUpdateInput) error {
 	}
 	if in.Summary != nil {
 		existing.Summary = *in.Summary
+	} else if in.Content != nil {
+		// 如果内容更新了但没传摘要，也自动更新一下摘要
+		limit := 150
+		contentRune := []rune(*in.Content)
+		if len(contentRune) > limit {
+			existing.Summary = string(contentRune[:limit]) + "..."
+		} else {
+			existing.Summary = *in.Content
+		}
 	}
 	if in.CategoryID != nil {
 		existing.CategoryID = *in.CategoryID
@@ -119,20 +140,36 @@ func (u *postUsecase) Get(ctx context.Context, idOrSlug string) (*PostDetailOutp
 	}
 
 	// 2. 补全分类信息
-	var category *model.Category
+	var category *CategoryDetailOutput
 	if post.CategoryID != "" {
-		category, _ = u.categoryRepo.GetByID(ctx, post.CategoryID)
+		c, _ := u.categoryRepo.GetByID(ctx, post.CategoryID)
+		if c != nil {
+			category = &CategoryDetailOutput{
+				ID:   c.ID,
+				Name: c.Name,
+				Slug: c.Slug,
+			}
+		}
 	}
 
 	// 3. 补全标签信息
-	var tags []*model.Tag
+	var tags []*TagDetailOutput
 	if len(post.TagIDs) > 0 {
 		tags, _ = u.tagUC.ListByIDs(ctx, post.TagIDs)
 	}
 
+	// 4. 处理标签集合
+	tagOutputs := make([]TagDetailOutput, 0, len(tags))
+	for _, t := range tags {
+		if t != nil {
+			tagOutputs = append(tagOutputs, *t)
+		}
+	}
+
 	return &PostDetailOutput{
-		ID:    post.ID,
-		Title: post.Title, Slug: post.Slug,
+		ID:          post.ID,
+		Title:       post.Title,
+		Slug:        post.Slug,
 		Content:     post.Content,
 		HTMLContent: post.HTMLContent,
 		Summary:     post.Summary,
@@ -140,14 +177,14 @@ func (u *postUsecase) Get(ctx context.Context, idOrSlug string) (*PostDetailOutp
 		ViewCount:   post.ViewCount,
 		CategoryID:  post.CategoryID,
 		Category:    category,
-		Tags:        tagsToValueSlice(tags),
+		Tags:        tagOutputs,
 		CreatedAt:   post.CreatedAt,
 		UpdatedAt:   post.UpdatedAt,
 		PublishedAt: post.PublishedAt,
 	}, nil
 }
 
-func (u *postUsecase) List(ctx context.Context, in *PostListInput) (*PostListOutput, error) {
+func (u *postUsecase) ListBy(ctx context.Context, in *PostListInput) (*PostListOutput, error) {
 	page := in.Page
 	if page < 1 {
 		page = 1
@@ -196,20 +233,30 @@ func (u *postUsecase) List(ctx context.Context, in *PostListInput) (*PostListOut
 		return nil, err
 	}
 
-	// 打印 Repos 返回的结果
-	fmt.Printf("DEBUG: Repo.List returned %d items, total %d\n", len(posts), total)
-
 	items := make([]*PostItem, 0, len(posts))
 	for _, p := range posts {
-		// 调试日志：fmt.Printf("DEBUG: Found post %s status %v\n", p.ID, p.Status)
-		var category *model.Category
+		var category *CategoryDetailOutput
 		if p.CategoryID != "" {
-			category, _ = u.categoryRepo.GetByID(ctx, p.CategoryID)
+			c, _ := u.categoryRepo.GetByID(ctx, p.CategoryID)
+			if c != nil {
+				category = &CategoryDetailOutput{
+					ID:   c.ID,
+					Name: c.Name,
+					Slug: c.Slug,
+				}
+			}
 		}
 
-		var tags []*model.Tag
+		var tags []*TagDetailOutput
 		if len(p.TagIDs) > 0 {
 			tags, _ = u.tagUC.ListByIDs(ctx, p.TagIDs)
+		}
+
+		tagOutputs := make([]TagDetailOutput, 0, len(tags))
+		for _, t := range tags {
+			if t != nil {
+				tagOutputs = append(tagOutputs, *t)
+			}
 		}
 
 		items = append(items, &PostItem{
@@ -220,7 +267,7 @@ func (u *postUsecase) List(ctx context.Context, in *PostListInput) (*PostListOut
 			Status:      p.Status,
 			ViewCount:   p.ViewCount,
 			Category:    category,
-			Tags:        tagsToValueSlice(tags),
+			Tags:        tagOutputs,
 			CreatedAt:   p.CreatedAt,
 			PublishedAt: p.PublishedAt,
 		})
@@ -230,15 +277,4 @@ func (u *postUsecase) List(ctx context.Context, in *PostListInput) (*PostListOut
 		Posts: items,
 		Total: total,
 	}, nil
-}
-
-// 辅助函数：将对象切片转为模型中的非指针切片
-func tagsToValueSlice(tags []*model.Tag) []model.Tag {
-	res := make([]model.Tag, 0, len(tags))
-	for _, t := range tags {
-		if t != nil {
-			res = append(res, *t)
-		}
-	}
-	return res
 }

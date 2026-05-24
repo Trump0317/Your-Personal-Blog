@@ -66,7 +66,11 @@
                 const fetchCategories = async () => {
                     try {
                         const res = await fetch('/blog/visitor/categories');
-                        categories.value = await res.json();
+                        if (!res.ok) return;
+                        const data = await res.json();
+                        categories.value = data.data || data || [];
+                    } catch (err) {
+                        console.error('Failed to fetch categories:', err);
                     } finally {
                         loading.value = false;
                     }

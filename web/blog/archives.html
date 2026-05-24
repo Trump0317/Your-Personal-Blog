@@ -75,7 +75,8 @@
                     try {
                         const res = await fetch('/blog/visitor/posts?page_size=100');
                         const data = await res.json();
-                        posts.value = data.posts || [];
+                        // 适配包含包层的数据格式
+                        posts.value = data.data?.items || data.posts || [];
                     } finally {
                         loading.value = false;
                     }

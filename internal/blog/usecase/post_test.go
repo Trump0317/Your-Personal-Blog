@@ -60,9 +60,14 @@ type MockTagUsecase struct {
 	mock.Mock
 }
 
-func (m *MockTagUsecase) List(ctx context.Context) ([]*model.Tag, error) {
+func (m *MockTagUsecase) List(ctx context.Context) ([]*TagDetailOutput, error) {
 	args := m.Called(ctx)
-	return args.Get(0).([]*model.Tag), args.Error(1)
+	return args.Get(0).([]*TagDetailOutput), args.Error(1)
+}
+
+func (m *MockTagUsecase) Create(ctx context.Context, in *TagCreateInput) error {
+	args := m.Called(ctx, in)
+	return args.Error(0)
 }
 
 func (m *MockTagUsecase) Delete(ctx context.Context, id string) error {
@@ -70,14 +75,9 @@ func (m *MockTagUsecase) Delete(ctx context.Context, id string) error {
 	return args.Error(0)
 }
 
-func (m *MockTagUsecase) GetOrCreates(ctx context.Context, names []string) ([]string, error) {
-	args := m.Called(ctx, names)
-	return args.Get(0).([]string), args.Error(1)
-}
-
-func (m *MockTagUsecase) ListByIDs(ctx context.Context, ids []string) ([]*model.Tag, error) {
+func (m *MockTagUsecase) ListByIDs(ctx context.Context, ids []string) ([]*TagDetailOutput, error) {
 	args := m.Called(ctx, ids)
-	return args.Get(0).([]*model.Tag), args.Error(1)
+	return args.Get(0).([]*TagDetailOutput), args.Error(1)
 }
 
 func (m *MockTagUsecase) GetTagsMapByIDs(ctx context.Context, ids []string) (map[string]*model.Tag, error) {
@@ -177,7 +177,7 @@ func TestPostUsecase_Get(t *testing.T) {
 		mockRepo.On("GetBySlug", ctx, postID).Return((*model.Post)(nil), assert.AnError)
 		mockRepo.On("GetByID", ctx, postID).Return(mockPost, nil)
 		mockCatRepo.On("GetByID", ctx, "cat_1").Return(&model.Category{ID: "cat_1", Name: "分类1"}, nil)
-		mockTagUC.On("ListByIDs", ctx, mockPost.TagIDs).Return([]*model.Tag{
+		mockTagUC.On("ListByIDs", ctx, mockPost.TagIDs).Return([]*TagDetailOutput{
 			{ID: "tag_1", Name: "标签1"},
 			{ID: "tag_2", Name: "标签2"},
 		}, nil)

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>文章详情 - TechBlog</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
         // 确保在任何 Vue 逻辑运行前 marked 已可用
@@ -77,8 +77,8 @@
                 </header>
 
                 <!-- 中间：正文 -->
-                <div class="p-8 sm:p-12 prose max-w-none text-gray-800 leading-relaxed text-lg" 
-                     v-html="renderMarkdown(post.content)">
+                <div class="px-8 sm:px-12 py-4 prose max-w-none text-gray-800 leading-relaxed text-lg" 
+                     v-html="renderMarkdown(post.content || '')">
                 </div>
 
                 <!-- 尾部：标签 -->
@@ -121,7 +121,9 @@
                     try {
                         const res = await fetch(`/blog/visitor/post/${idOrSlug}`);
                         if (!res.ok) throw new Error('文章不存在或已被删除');
-                        post.value = await res.json();
+                        const data = await res.json();
+                        // 修正：从 data.data 中获取文章对象
+                        post.value = data.data || data;
                     } catch (e) {
                         error.value = e.message;
                     } finally {
@@ -132,14 +134,19 @@
                 const renderMarkdown = (content) => {
                     if (!content) return '';
                     try {
-                        // 兼容不同版本的 marked
+                        const strContent = String(content);
+                        // 兼容多种 marked 调用方式
                         if (typeof marked.parse === 'function') {
-                            return marked.parse(content);
+                            const result = marked.parse(strContent);
+                            return typeof result === 'string' ? result : (result.then ? 'Markdown 正在加载...' : '');
                         }
-                        return marked(content);
+                        if (typeof marked === 'function') {
+                            return marked(strContent);
+                        }
+                        return strContent;
                     } catch (e) {
-                        console.error('Markdown rendering error:', e);
-                        return content;
+                        console.error('Markdown 渲染错误:', e);
+                        return String(content);
                     }
                 };
 

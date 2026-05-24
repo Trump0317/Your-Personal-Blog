@@ -16,6 +16,14 @@ type MemoryFileRepo struct {
 	nextID int64
 }
 
+func copyFile(f *model.File) *model.File {
+	if f == nil {
+		return nil
+	}
+	cf := *f
+	return &cf
+}
+
 func NewMemoryFileRepo() *MemoryFileRepo {
 	return &MemoryFileRepo{
 		files:  make(map[string]*model.File),
@@ -45,7 +53,7 @@ func (r *MemoryFileRepo) GetByID(ctx context.Context, id string) (*model.File, e
 	if !ok {
 		return nil, errors.New("file not found in memory")
 	}
-	return file, nil
+	return copyFile(file), nil
 }
 
 func (r *MemoryFileRepo) ListByUser(ctx context.Context, userID string, limit, offset int) ([]*model.File, error) {
@@ -55,7 +63,7 @@ func (r *MemoryFileRepo) ListByUser(ctx context.Context, userID string, limit, o
 	var result []*model.File
 	for _, f := range r.files {
 		if f.Uploader == userID {
-			result = append(result, f)
+			result = append(result, copyFile(f))
 		}
 	}
 
@@ -88,6 +96,9 @@ func (r *MemoryFileRepo) UpdateStatus(ctx context.Context, id string, status mod
 	if !ok {
 		return errors.New("file not found in memory")
 	}
-	file.Status = status
+
+	newFile := *file
+	newFile.Status = status
+	r.files[id] = &newFile
 	return nil
 }
