@@ -157,6 +157,11 @@
                     <textarea v-model="form.content" rows="12" class="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none font-mono" placeholder="写入正文..."></textarea>
                 </div>
 
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">摘要 (可选)</label>
+                    <textarea v-model="form.summary" rows="3" class="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none" placeholder="如果不填写，系统将自动从正文中生成摘要..."></textarea>
+                </div>
+
                 <div class="flex justify-end space-x-4 pt-4 border-t">
                     <button @click="savePost('draft')" class="px-6 py-2 border rounded-lg hover:bg-gray-50">{{ form.id ? '存为草稿' : '保存草稿' }}</button>
                     <button @click="savePost('published')" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">{{ form.id ? '发布更新' : '直接发布' }}</button>
@@ -175,7 +180,7 @@
                 const tags = ref([]);
                 const selectedTagIds = ref([]);
                 const newTagName = ref('');
-                const form = ref({ id: null, title: '', slug: '', content: '', category_id: '', status: 'draft' });
+                const form = ref({ id: null, title: '', slug: '', content: '', summary: '', category_id: '', status: 'draft' });
                 const catForm = ref({ id: null, name: '', slug: '' });
 
                 const getAuth = () => localStorage.getItem('blog_admin_auth');
@@ -243,10 +248,27 @@
 
                 const showList = () => { view.value = 'list'; fetchPosts(); };
 
-                const openEditor = (post = null) => {
+                const openEditor = async (post = null) => {
                     if (post) {
+                        // 初始填充（防止闪烁）
                         form.value = { ...post, category_id: post.category?.id || '' };
                         selectedTagIds.value = (post.tags || []).map(t => t.id);
+                        
+                        // 异步获取完整详情（包括正文内容）
+                        try {
+                            const res = await secureFetch(`/blog/admin/posts/${post.id}`);
+                            if (res && res.ok) {
+                                const data = await res.json();
+                                const detail = data.data || data;
+                                form.value.content = detail.content || '';
+                                form.value.summary = detail.summary || '';
+                                // 同步更新标签和分类，以防列表数据不全
+                                if (detail.category) form.value.category_id = detail.category.id;
+                                if (detail.tags) selectedTagIds.value = detail.tags.map(t => t.id);
+                            }
+                        } catch (e) {
+                            console.error('获取文章详情失败:', e);
+                        }
                     } else {
                         form.value = { id: null, title: '', slug: '', content: '', category_id: '', status: 'draft' };
                         selectedTagIds.value = [];

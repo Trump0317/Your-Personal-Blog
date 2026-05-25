@@ -145,6 +145,17 @@ func (ctrl *adminController) CreatePost(c *gin.Context) {
 	c.JSON(http.StatusCreated, Response{Code: 0, Message: "success", Data: gin.H{"id": id}})
 }
 
+// GetPost 获取文章详情 (管理端支持获取草稿)
+func (ctrl *adminController) GetPost(c *gin.Context) {
+	id := c.Param("id")
+	post, err := ctrl.postUC.Get(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, Response{Code: http.StatusNotFound, Message: "post not found"})
+		return
+	}
+	c.JSON(http.StatusOK, Response{Code: 0, Message: "success", Data: post})
+}
+
 // UpdatePost 更新文章
 func (ctrl *adminController) UpdatePost(c *gin.Context) {
 	var body UpdatePostRequest
