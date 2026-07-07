@@ -1,40 +1,31 @@
-.PHONY: build run clean build-cli help
+.PHONY: dev build run clean
 
-# 变量定义
-BINARY_DIR=bin
-BLOG_SERVER_OUT=$(BINARY_DIR)/blog-server
-BLOG_CLI_OUT=$(BINARY_DIR)/blog-cli
+# ── 开发 ──
+dev:
+	@echo "Starting: backend :8080 | frontend :3000"
+	@trap 'kill 0' EXIT; \
+		(cd backend && go run ./cmd/blog-server/ &) \
+		(cd frontend && npm run dev &) \
+		wait
 
-# 默认构建目标
-build: build-server build-cli
+# ── 生产构建 ──
+build:
+	@echo "Building frontend..."
+	cd frontend && npm run build
+	@echo "Building backend..."
+	cd backend && go build -o ../bin/blog-server ./cmd/blog-server/
+	@echo "Done → bin/blog-server"
 
-# 构建博客服务器
-build-server:
-	@echo "正在编译 blog-server..."
-	@mkdir -p $(BINARY_DIR)
-	go build -o $(BLOG_SERVER_OUT) cmd/blog-server/main.go
+# ── 生产运行 ──
+run: build
+	./bin/blog-server
 
-# 构建命令行工具
-build-cli:
-	@echo "正在编译 blog-cli..."
-	@mkdir -p $(BINARY_DIR)
-	go build -o $(BLOG_CLI_OUT) cmd/blog-cli/main.go
-
-# 运行服务器
-run: build-server
-	@echo "正在启动服务器..."
-	./$(BLOG_SERVER_OUT)
-
-# 清理构建产物
+# ── 清理 ──
 clean:
-	@echo "清理二进制文件..."
-	rm -rf $(BINARY_DIR)
+	rm -rf bin/ frontend/dist/ backend/blog.db
 
-# 帮助信息
 help:
-	@echo "Makefile 使用说明:"
-	@echo "  make build          - 编译所有二进制文件"
-	@echo "  make run            - 编译并运行博客服务器"
-	@echo "  make build-server   - 仅编译博客服务器"
-	@echo "  make build-cli      - 仅编译命令行工具"
-	@echo "  make clean          - 删除 bin 目录"
+	@echo "make dev      开发模式"
+	@echo "make build    生产构建"
+	@echo "make run      构建并运行"
+	@echo "make clean    清理"
