@@ -191,16 +191,19 @@ func rssHandler(c *gin.Context, postSvc *post.Service) {
 		return
 	}
 
+	// 从请求 host 或环境变量推导站点 URL
+	baseURL := resolveBaseURL(c)
+
 	var items strings.Builder
 	for _, p := range posts {
 		items.WriteString(fmt.Sprintf(`
 <item>
   <title>%s</title>
-  <link>https://example.com/post/%s</link>
+  <link>%s/post/%s</link>
   <description>%s</description>
   <pubDate>%s</pubDate>
 </item>`,
-			escXML(p.Title), escXML(p.Slug), escXML(p.Summary),
+			escXML(p.Title), baseURL, escXML(p.Slug), escXML(p.Summary),
 			p.CreatedAt.Format(time.RFC1123Z)))
 	}
 
@@ -208,13 +211,24 @@ func rssHandler(c *gin.Context, postSvc *post.Service) {
 <rss version="2.0">
 <channel>
   <title>My Blog</title>
-  <link>https://example.com</link>
+  <link>%s</link>
   <description>探索技术、设计与思考的交汇</description>%s
 </channel>
-</rss>`, items.String())
+</rss>`, baseURL, items.String())
 
 	c.Header("Content-Type", "application/rss+xml")
 	c.String(200, rss)
+}
+
+func resolveBaseURL(c *gin.Context) string {
+	if u := os.Getenv("BLOG_BASE_URL"); u != "" {
+		return strings.TrimRight(u, "/")
+	}
+	scheme := "http"
+	if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
+		scheme = "https"
+	}
+	return scheme + "://" + c.Request.Host
 }
 
 func escXML(s string) string {

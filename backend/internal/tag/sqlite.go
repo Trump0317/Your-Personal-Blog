@@ -67,6 +67,20 @@ func (s *SQLiteStore) GetByName(ctx context.Context, name string) (*Tag, error) 
 	return t, nil
 }
 
+func (s *SQLiteStore) GetBySlug(ctx context.Context, slug string) (*Tag, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT id, name, slug FROM tags WHERE slug = ?`, slug,
+	)
+	t := &Tag{}
+	if err := row.Scan(&t.ID, &t.Name, &t.Slug); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.New("tag not found")
+		}
+		return nil, err
+	}
+	return t, nil
+}
+
 func (s *SQLiteStore) List(ctx context.Context) ([]*Tag, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT id, name, slug FROM tags ORDER BY name`)
 	if err != nil {

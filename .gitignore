@@ -10,6 +10,7 @@ go.work go.work.sum
 
 # Build outputs
 bin/
+backend/blog-server
 
 # Frontend
 frontend/node_modules/

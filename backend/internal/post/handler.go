@@ -21,7 +21,7 @@ func (h *Handler) RegisterPublic(r *gin.RouterGroup) {
 	r.GET("/stats", h.Stats)
 	r.GET("/archive", h.Archive)
 	r.GET("/posts", h.ListPublic)
-	r.GET("/posts/:slug", h.Get)
+	r.GET("/posts/:slug", h.GetPublic)
 }
 
 // ── 管理端路由 ──
@@ -95,6 +95,24 @@ func (h *Handler) ListPublic(c *gin.Context) {
 		"total": total,
 		"page":  f.Offset/f.Limit + 1,
 	})
+}
+
+func (h *Handler) GetPublic(c *gin.Context) {
+	slug := c.Param("slug")
+	if slug == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "slug required"})
+		return
+	}
+	post, err := h.svc.Get(c.Request.Context(), slug)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "post not found"})
+		return
+	}
+	if !post.Published {
+		c.JSON(http.StatusNotFound, gin.H{"error": "post not found"})
+		return
+	}
+	c.JSON(http.StatusOK, post)
 }
 
 func (h *Handler) Get(c *gin.Context) {

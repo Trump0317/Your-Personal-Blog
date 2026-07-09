@@ -64,13 +64,13 @@ function go(p) { if (p >= 1 && p <= totalPages.value) fetchPosts(category.value.
 
 onMounted(async () => {
   try {
-    const cats = await categories.list()
-    const cat = (cats || []).find(c => c.slug === route.params.slug)
-    if (cat) {
-      category.value = cat
-      document.title = cat.name + ' - My Blog'
-      await fetchPosts(cat.id)
-    }
-  } catch { loading.value = false }
+    const cat = await categories.get(route.params.slug)
+    category.value = cat
+    document.title = (cat.name || '分类') + ' - My Blog'
+    await fetchPosts(cat.id)
+  } catch {
+    category.value = null
+    loading.value = false
+  }
 })
 </script>

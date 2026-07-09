@@ -16,6 +16,7 @@ func NewHandler(svc *Service) *Handler {
 
 func (h *Handler) RegisterPublic(r *gin.RouterGroup) {
 	r.GET("/categories", h.ListWithCount)
+	r.GET("/categories/:slug", h.GetBySlug)
 }
 
 func (h *Handler) RegisterAdmin(r *gin.RouterGroup) {
@@ -82,6 +83,20 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) GetBySlug(c *gin.Context) {
+	slug := c.Param("slug")
+	if slug == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "slug required"})
+		return
+	}
+	cat, err := h.svc.GetBySlug(c.Request.Context(), slug)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "category not found"})
+		return
+	}
+	c.JSON(http.StatusOK, cat)
 }
 
 func (h *Handler) Delete(c *gin.Context) {

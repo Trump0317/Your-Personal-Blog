@@ -68,7 +68,13 @@ func (s *SQLiteStore) Create(ctx context.Context, p *Post) error {
 func (s *SQLiteStore) Get(ctx context.Context, idOrSlug string) (*Post, error) {
 	const q = `SELECT id, title, slug, content, html_content, summary, category_id, published, created_at, updated_at FROM posts WHERE id = ? OR slug = ?`
 	row := s.db.QueryRowContext(ctx, q, idOrSlug, idOrSlug)
-	return scanPost(row)
+	p, err := scanPost(row)
+	if err != nil {
+		return nil, err
+	}
+	tagIDs, _ := s.getTagIDs(ctx, p.ID)
+	p.TagIDs = tagIDs
+	return p, nil
 }
 
 func (s *SQLiteStore) List(ctx context.Context, f Filter) ([]*Post, int, error) {

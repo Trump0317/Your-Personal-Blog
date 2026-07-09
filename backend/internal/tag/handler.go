@@ -17,6 +17,7 @@ func NewHandler(svc *Service) *Handler {
 // RegisterPublic 注册公开路由
 func (h *Handler) RegisterPublic(r *gin.RouterGroup) {
 	r.GET("/tags", h.ListWithCount)
+	r.GET("/tags/:slug", h.GetBySlug)
 }
 
 // RegisterAdmin 注册管理端路由
@@ -66,6 +67,20 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"id": id})
+}
+
+func (h *Handler) GetBySlug(c *gin.Context) {
+	slug := c.Param("slug")
+	if slug == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "slug required"})
+		return
+	}
+	tag, err := h.svc.GetBySlug(c.Request.Context(), slug)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "tag not found"})
+		return
+	}
+	c.JSON(http.StatusOK, tag)
 }
 
 func (h *Handler) Delete(c *gin.Context) {

@@ -61,9 +61,13 @@ function go(p) { if (p >= 1 && p <= totalPages.value) fetchPosts(tag.value.id, p
 
 onMounted(async () => {
   try {
-    const tagList = await tags.list()
-    const t = (tagList || []).find(x => x.slug === route.params.slug)
-    if (t) { tag.value = t; document.title = t.name + ' 标签 - My Blog'; await fetchPosts(t.id) }
-  } catch { loading.value = false }
+    const t = await tags.get(route.params.slug)
+    tag.value = t
+    document.title = (t.name || '标签') + ' - My Blog'
+    await fetchPosts(t.id)
+  } catch {
+    tag.value = null
+    loading.value = false
+  }
 })
 </script>

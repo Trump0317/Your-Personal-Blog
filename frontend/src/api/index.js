@@ -64,6 +64,9 @@ export const categories = {
 export const tags = {
   /** GET /api/tags → [{ id, name, slug, post_count }] */
   list() { return request(`${BASE}/tags`) },
+
+  /** GET /api/tags/:slug → { id, name, slug } */
+  get(slug) { return request(`${BASE}/tags/${encodeURIComponent(slug)}`) },
 }
 
 // ── 归档统计 ──

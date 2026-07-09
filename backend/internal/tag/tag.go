@@ -28,6 +28,7 @@ type Store interface {
 	Create(ctx context.Context, t *Tag) error
 	Get(ctx context.Context, id string) (*Tag, error)
 	GetByName(ctx context.Context, name string) (*Tag, error)
+	GetBySlug(ctx context.Context, slug string) (*Tag, error)
 	List(ctx context.Context) ([]*Tag, error)
 	ListWithCount(ctx context.Context) ([]*TagWithCount, error)
 	GetByIDs(ctx context.Context, ids []string) ([]*Tag, error)
@@ -80,6 +81,10 @@ func (s *Service) GetByIDs(ctx context.Context, ids []string) ([]*Tag, error) {
 		return nil, nil
 	}
 	return s.store.GetByIDs(ctx, ids)
+}
+
+func (s *Service) GetBySlug(ctx context.Context, slug string) (*Tag, error) {
+	return s.store.GetBySlug(ctx, slug)
 }
 
 func (s *Service) Delete(ctx context.Context, id string) error {
