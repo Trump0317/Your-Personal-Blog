@@ -97,6 +97,30 @@ func (s *SQLiteStore) Update(ctx context.Context, c *Category) error {
 	return err
 }
 
+func (s *SQLiteStore) ListWithCount(ctx context.Context) ([]*CategoryWithCount, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT c.id, c.name, c.slug, COUNT(p.id) as post_count
+		FROM categories c
+		LEFT JOIN posts p ON p.category_id = c.id AND p.published = 1
+		GROUP BY c.id
+		ORDER BY post_count DESC, c.name
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []*CategoryWithCount
+	for rows.Next() {
+		cc := &CategoryWithCount{}
+		if err := rows.Scan(&cc.ID, &cc.Name, &cc.Slug, &cc.PostCount); err != nil {
+			return nil, err
+		}
+		list = append(list, cc)
+	}
+	return list, rows.Err()
+}
+
 func (s *SQLiteStore) Delete(ctx context.Context, id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

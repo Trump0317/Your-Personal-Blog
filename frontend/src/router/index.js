@@ -1,19 +1,18 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Home from '../views/Home.vue'
-import Post from '../views/Post.vue'
-import Admin from '../views/Admin.vue'
-import Archive from '../views/Archive.vue'
-import Category from '../views/Category.vue'
 
 const routes = [
-  { path: '/', name: 'Home', component: Home },
-  { path: '/post/:slug', name: 'Post', component: Post },
-  { path: '/archive', name: 'Archive', component: Archive },
-  { path: '/category/:slug', name: 'Category', component: Category },
-  { path: '/admin', name: 'Admin', component: Admin },
+  { path: '/',              name: 'Home',       component: () => import('../views/Home.vue') },
+  { path: '/post/:slug',    name: 'Post',       component: () => import('../views/Post.vue') },
+  { path: '/archive',       name: 'Archive',    component: () => import('../views/Archive.vue') },
+  { path: '/categories',    name: 'Categories', component: () => import('../views/Categories.vue') },
+  { path: '/categories/:slug', name: 'Category', component: () => import('../views/Category.vue') },
+  { path: '/tags/:slug',    name: 'Tag',        component: () => import('../views/Tag.vue') },
+  { path: '/about',         name: 'About',      component: () => import('../views/About.vue') },
+  { path: '/admin',         name: 'Admin',      component: () => import('../views/Admin.vue') },
 ]
 
 export default createRouter({
   history: createWebHistory(),
   routes,
+  scrollBehavior() { return { top: 0 } },
 })

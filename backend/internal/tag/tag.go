@@ -15,12 +15,21 @@ type Tag struct {
 	Slug string `json:"slug"`
 }
 
+// TagWithCount 带文章数的标签
+type TagWithCount struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Slug      string `json:"slug"`
+	PostCount int    `json:"post_count"`
+}
+
 // Store 标签存储接口
 type Store interface {
 	Create(ctx context.Context, t *Tag) error
 	Get(ctx context.Context, id string) (*Tag, error)
 	GetByName(ctx context.Context, name string) (*Tag, error)
 	List(ctx context.Context) ([]*Tag, error)
+	ListWithCount(ctx context.Context) ([]*TagWithCount, error)
 	GetByIDs(ctx context.Context, ids []string) ([]*Tag, error)
 	Delete(ctx context.Context, id string) error
 }
@@ -46,11 +55,11 @@ func (s *Service) CreateOrGet(ctx context.Context, name string) (string, error) 
 		return existing.ID, nil
 	}
 
-	slug := toSlug(name)
+	id := uuid.New().String()
 	t := &Tag{
-		ID:   uuid.New().String(),
+		ID:   id,
 		Name: name,
-		Slug: slug,
+		Slug: toSlug(name, id[:8]),
 	}
 	if err := s.store.Create(ctx, t); err != nil {
 		return "", err
@@ -60,6 +69,10 @@ func (s *Service) CreateOrGet(ctx context.Context, name string) (string, error) 
 
 func (s *Service) List(ctx context.Context) ([]*Tag, error) {
 	return s.store.List(ctx)
+}
+
+func (s *Service) ListWithCount(ctx context.Context) ([]*TagWithCount, error) {
+	return s.store.ListWithCount(ctx)
 }
 
 func (s *Service) GetByIDs(ctx context.Context, ids []string) ([]*Tag, error) {
@@ -73,6 +86,13 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 	return s.store.Delete(ctx, id)
 }
 
-func toSlug(name string) string {
-	return strings.ToLower(strings.ReplaceAll(name, " ", "-"))
+func toSlug(name, suffix string) string {
+	s := strings.ToLower(strings.TrimSpace(name))
+	s = strings.ReplaceAll(s, " ", "-")
+	for _, r := range s {
+		if r > 127 {
+			return suffix
+		}
+	}
+	return s
 }

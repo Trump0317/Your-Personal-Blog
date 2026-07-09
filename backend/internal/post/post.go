@@ -53,12 +53,33 @@ type Store interface {
 	Update(ctx context.Context, p *Post) error
 	Delete(ctx context.Context, id string) error
 	SetTags(ctx context.Context, postID string, tagIDs []string) error
+	Stats(ctx context.Context) (PostStats, error)
+	Archive(ctx context.Context) ([]ArchiveYear, error)
+}
+
+type PostStats struct {
+	PostCount     int `json:"post_count"`
+	CategoryCount int `json:"category_count"`
+	TagCount      int `json:"tag_count"`
+}
+
+type ArchiveMonth struct {
+	Month int `json:"month"`
+	Count int `json:"count"`
+}
+
+type ArchiveYear struct {
+	Year   int            `json:"year"`
+	Count  int            `json:"count"`
+	Months []ArchiveMonth `json:"months"`
 }
 
 type Filter struct {
 	CategoryID string
 	TagID      string
 	Query      string
+	Year       int
+	Month      int
 	Published  *bool
 	Offset     int
 	Limit      int
@@ -189,7 +210,7 @@ func (s *Service) Update(ctx context.Context, in UpdateInput) error {
 	if in.Published != nil {
 		p.Published = *in.Published
 	}
-	if in.Slug != nil {
+	if in.Slug != nil && *in.Slug != "" {
 		p.Slug = *in.Slug
 	}
 	p.UpdatedAt = time.Now()
@@ -256,12 +277,25 @@ func (s *Service) fillRefs(ctx context.Context, p *Post) (*Post, error) {
 	return p, nil
 }
 
+func (s *Service) Stats(ctx context.Context) (PostStats, error) {
+	return s.store.Stats(ctx)
+}
+
+func (s *Service) Archive(ctx context.Context) ([]ArchiveYear, error) {
+	return s.store.Archive(ctx)
+}
+
 // ── 辅助 ──
 
 func toSlug(s string) string {
-	s = strings.ToLower(s)
-	s = strings.TrimSpace(s)
+	s = strings.ToLower(strings.TrimSpace(s))
 	s = strings.ReplaceAll(s, " ", "-")
+	// 含有非 ASCII 字符时用时间戳生成英文 slug
+	for _, r := range s {
+		if r > 127 {
+			return fmt.Sprintf("post-%d", time.Now().UnixMilli()%100000)
+		}
+	}
 	return s
 }
 

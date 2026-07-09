@@ -16,7 +16,7 @@ func NewHandler(svc *Service) *Handler {
 
 // RegisterPublic 注册公开路由
 func (h *Handler) RegisterPublic(r *gin.RouterGroup) {
-	r.GET("/tags", h.List)
+	r.GET("/tags", h.ListWithCount)
 }
 
 // RegisterAdmin 注册管理端路由
@@ -34,6 +34,18 @@ func (h *Handler) List(c *gin.Context) {
 	}
 	if tags == nil {
 		tags = []*Tag{}
+	}
+	c.JSON(http.StatusOK, tags)
+}
+
+func (h *Handler) ListWithCount(c *gin.Context) {
+	tags, err := h.svc.ListWithCount(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if tags == nil {
+		tags = []*TagWithCount{}
 	}
 	c.JSON(http.StatusOK, tags)
 }

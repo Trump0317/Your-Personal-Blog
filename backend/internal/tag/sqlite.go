@@ -113,6 +113,31 @@ func (s *SQLiteStore) GetByIDs(ctx context.Context, ids []string) ([]*Tag, error
 	return list, rows.Err()
 }
 
+func (s *SQLiteStore) ListWithCount(ctx context.Context) ([]*TagWithCount, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT t.id, t.name, t.slug, COUNT(pt.post_id) as post_count
+		FROM tags t
+		LEFT JOIN post_tags pt ON pt.tag_id = t.id
+		LEFT JOIN posts p ON p.id = pt.post_id AND p.published = 1
+		GROUP BY t.id
+		ORDER BY post_count DESC, t.name
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []*TagWithCount
+	for rows.Next() {
+		tc := &TagWithCount{}
+		if err := rows.Scan(&tc.ID, &tc.Name, &tc.Slug, &tc.PostCount); err != nil {
+			return nil, err
+		}
+		list = append(list, tc)
+	}
+	return list, rows.Err()
+}
+
 func (s *SQLiteStore) Delete(ctx context.Context, id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

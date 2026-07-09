@@ -1,10 +1,10 @@
 <template>
   <div>
     <div v-if="loading" class="card"><p class="muted">加载中...</p></div>
-    <template v-else-if="category">
+    <template v-else-if="tag">
       <section class="hero">
-        <p class="kicker">Category</p>
-        <h1 class="title">{{ category.name }}</h1>
+        <p class="kicker">Tag</p>
+        <h1 class="title">{{ tag.name }}</h1>
         <p class="desc">共 {{ total }} 篇文章。</p>
       </section>
 
@@ -14,8 +14,9 @@
           <p class="excerpt">{{ p.summary }}</p>
           <div class="row">
             <span>{{ fmtDate(p.created_at) }}</span>
-            <span>{{ category.name }}</span>
-            <span>{{ monthLabel(p.created_at) }}</span>
+            <span v-if="p.category">
+              <router-link :to="`/categories/${p.category.slug}`">{{ p.category.name }}</router-link>
+            </span>
           </div>
         </article>
       </div>
@@ -26,17 +27,17 @@
         <a :class="{ disabled: page >= totalPages }" @click="go(page + 1)">下一页</a>
       </div>
     </template>
-    <div v-else-if="!loading" class="card"><p class="muted">分类不存在。</p></div>
+    <div v-else-if="!loading" class="card"><p class="muted">标签不存在。</p></div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { posts, categories } from '../api'
+import { posts, tags } from '../api'
 
 const route = useRoute()
-const category = ref(null)
+const tag = ref(null)
 const postsList = ref([])
 const loading = ref(true)
 const page = ref(1)
@@ -44,33 +45,25 @@ const total = ref(0)
 const size = 12
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / size)))
-
 const fmtDate = s => s ? new Date(s).toLocaleDateString('zh-CN') : ''
-const monthLabel = s => { if (!s) return ''; const d = new Date(s); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') }
 
-async function fetchPosts(catId, p = 1) {
+async function fetchPosts(tagId, p = 1) {
   loading.value = true
   try {
-    const data = await posts.list({ page: p, size, category_id: catId })
+    const data = await posts.list({ page: p, size, tag_id: tagId })
     postsList.value = data.posts || []
     total.value = data.total || 0
     page.value = p
-  } finally {
-    loading.value = false
-  }
+  } finally { loading.value = false }
 }
 
-function go(p) { if (p >= 1 && p <= totalPages.value) fetchPosts(category.value.id, p) }
+function go(p) { if (p >= 1 && p <= totalPages.value) fetchPosts(tag.value.id, p) }
 
 onMounted(async () => {
   try {
-    const cats = await categories.list()
-    const cat = (cats || []).find(c => c.slug === route.params.slug)
-    if (cat) {
-      category.value = cat
-      document.title = cat.name + ' - My Blog'
-      await fetchPosts(cat.id)
-    }
+    const tagList = await tags.list()
+    const t = (tagList || []).find(x => x.slug === route.params.slug)
+    if (t) { tag.value = t; document.title = t.name + ' 标签 - My Blog'; await fetchPosts(t.id) }
   } catch { loading.value = false }
 })
 </script>

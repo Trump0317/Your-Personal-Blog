@@ -18,6 +18,8 @@ func NewHandler(svc *Service) *Handler {
 // ── 公开路由 ──
 
 func (h *Handler) RegisterPublic(r *gin.RouterGroup) {
+	r.GET("/stats", h.Stats)
+	r.GET("/archive", h.Archive)
 	r.GET("/posts", h.ListPublic)
 	r.GET("/posts/:slug", h.Get)
 }
@@ -38,6 +40,11 @@ func (h *Handler) RegisterAdmin(r *gin.RouterGroup) {
 
 func (h *Handler) ListPublic(c *gin.Context) {
 	limit := 12
+	if v := c.Query("size"); v != "" {
+		if n, _ := strconv.Atoi(v); n > 0 && n <= 50 {
+			limit = n
+		}
+	}
 	if v := c.Query("page_size"); v != "" {
 		if n, _ := strconv.Atoi(v); n > 0 && n <= 50 {
 			limit = n
@@ -50,11 +57,27 @@ func (h *Handler) ListPublic(c *gin.Context) {
 			f.Offset = (page - 1) * limit
 		}
 	}
-	if v := c.Query("category"); v != "" {
+	if v := c.Query("category_id"); v != "" {
 		f.CategoryID = v
 	}
-	if v := c.Query("tag"); v != "" {
+	if v := c.Query("category"); v != "" {
+		if f.CategoryID == "" {
+			f.CategoryID = v
+		}
+	}
+	if v := c.Query("tag_id"); v != "" {
 		f.TagID = v
+	}
+	if v := c.Query("tag"); v != "" {
+		if f.TagID == "" {
+			f.TagID = v
+		}
+	}
+	if v := c.Query("year"); v != "" {
+		f.Year, _ = strconv.Atoi(v)
+	}
+	if v := c.Query("month"); v != "" {
+		f.Month, _ = strconv.Atoi(v)
 	}
 	if v := c.Query("q"); v != "" {
 		f.Query = v
@@ -198,4 +221,22 @@ func (h *Handler) Unpublish(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) Stats(c *gin.Context) {
+	stats, err := h.svc.Stats(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, stats)
+}
+
+func (h *Handler) Archive(c *gin.Context) {
+	years, err := h.svc.Archive(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, years)
 }

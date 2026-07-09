@@ -15,7 +15,7 @@ func NewHandler(svc *Service) *Handler {
 }
 
 func (h *Handler) RegisterPublic(r *gin.RouterGroup) {
-	r.GET("/categories", h.List)
+	r.GET("/categories", h.ListWithCount)
 }
 
 func (h *Handler) RegisterAdmin(r *gin.RouterGroup) {
@@ -33,6 +33,18 @@ func (h *Handler) List(c *gin.Context) {
 	}
 	if cats == nil {
 		cats = []*Category{}
+	}
+	c.JSON(http.StatusOK, cats)
+}
+
+func (h *Handler) ListWithCount(c *gin.Context) {
+	cats, err := h.svc.ListWithCount(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if cats == nil {
+		cats = []*CategoryWithCount{}
 	}
 	c.JSON(http.StatusOK, cats)
 }

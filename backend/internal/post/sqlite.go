@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 )
@@ -77,6 +78,18 @@ func (s *SQLiteStore) List(ctx context.Context, f Filter) ([]*Post, int, error) 
 	if f.CategoryID != "" {
 		conditions = append(conditions, "category_id = ?")
 		args = append(args, f.CategoryID)
+	}
+	if f.TagID != "" {
+		conditions = append(conditions, "id IN (SELECT post_id FROM post_tags WHERE tag_id = ?)")
+		args = append(args, f.TagID)
+	}
+	if f.Year > 0 {
+		conditions = append(conditions, "strftime('%Y', created_at) = ?")
+		args = append(args, fmt.Sprintf("%04d", f.Year))
+	}
+	if f.Month > 0 {
+		conditions = append(conditions, "strftime('%m', created_at) = ?")
+		args = append(args, fmt.Sprintf("%02d", f.Month))
 	}
 	if f.Published != nil {
 		conditions = append(conditions, "published = ?")
@@ -189,6 +202,52 @@ func (s *SQLiteStore) getTagIDs(ctx context.Context, postID string) ([]string, e
 		ids = append(ids, id)
 	}
 	return ids, rows.Err()
+}
+
+func (s *SQLiteStore) Stats(ctx context.Context) (PostStats, error) {
+	var ps PostStats
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM posts WHERE published = 1`).Scan(&ps.PostCount)
+	if err != nil {
+		return ps, err
+	}
+	s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM categories`).Scan(&ps.CategoryCount)
+	s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM tags`).Scan(&ps.TagCount)
+	return ps, nil
+}
+
+func (s *SQLiteStore) Archive(ctx context.Context) ([]ArchiveYear, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT strftime('%Y', created_at) as year, strftime('%m', created_at) as month, COUNT(*) as cnt
+		FROM posts WHERE published = 1
+		GROUP BY year, month ORDER BY year DESC, month DESC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	yearMap := make(map[int]*ArchiveYear)
+	var years []*ArchiveYear
+	for rows.Next() {
+		var y, m, c int
+		if err := rows.Scan(&y, &m, &c); err != nil {
+			return nil, err
+		}
+		ay, ok := yearMap[y]
+		if !ok {
+			ay = &ArchiveYear{Year: y, Months: []ArchiveMonth{}}
+			yearMap[y] = ay
+			years = append(years, ay)
+		}
+		ay.Count += c
+		ay.Months = append(ay.Months, ArchiveMonth{Month: m, Count: c})
+	}
+
+	result := make([]ArchiveYear, len(years))
+	for i, y := range years {
+		result[i] = *y
+	}
+	return result, rows.Err()
 }
 
 func scanPost(row *sql.Row) (*Post, error) {
