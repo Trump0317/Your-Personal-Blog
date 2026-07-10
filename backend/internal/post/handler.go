@@ -132,11 +132,17 @@ func (h *Handler) Get(c *gin.Context) {
 // ── 管理端接口 ──
 
 func (h *Handler) ListAdmin(c *gin.Context) {
-	f := Filter{Limit: 50}
+	limit := 50
+	if v := c.Query("size"); v != "" {
+		if n, _ := strconv.Atoi(v); n > 0 && n <= 100 {
+			limit = n
+		}
+	}
+	f := Filter{Limit: limit}
 	if v := c.Query("page"); v != "" {
 		page, _ := strconv.Atoi(v)
 		if page > 0 {
-			f.Offset = (page - 1) * f.Limit
+			f.Offset = (page - 1) * limit
 		}
 	}
 	// 管理员可以看到所有状态
