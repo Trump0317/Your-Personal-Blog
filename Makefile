@@ -14,7 +14,9 @@ build:
 	cd frontend && npm run build
 	@echo "Building backend..."
 	cd backend && go build -o ../bin/blog-server ./cmd/blog-server/
-	@echo "Done → bin/blog-server"
+	@echo "Building CLI..."
+	cd backend && go build -o ../bin/ypb ./cmd/ypb/
+	@echo "Done → bin/blog-server, bin/ypb"
 
 # ── 生产运行 ──
 run: build
