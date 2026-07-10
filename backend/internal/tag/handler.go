@@ -24,6 +24,7 @@ func (h *Handler) RegisterPublic(r *gin.RouterGroup) {
 func (h *Handler) RegisterAdmin(r *gin.RouterGroup) {
 	r.GET("/tags", h.List)
 	r.POST("/tags", h.Create)
+	r.PUT("/tags/:id", h.Update)
 	r.DELETE("/tags/:id", h.Delete)
 }
 
@@ -81,6 +82,23 @@ func (h *Handler) GetBySlug(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, tag)
+}
+
+type updateTagInput struct {
+	Name string `json:"name" binding:"required"`
+}
+
+func (h *Handler) Update(c *gin.Context) {
+	var in updateTagInput
+	if err := c.ShouldBindJSON(&in); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name required"})
+		return
+	}
+	if err := h.svc.Update(c.Request.Context(), c.Param("id"), in.Name); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
 func (h *Handler) Delete(c *gin.Context) {

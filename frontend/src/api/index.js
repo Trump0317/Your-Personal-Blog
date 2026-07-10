@@ -156,6 +156,12 @@ export const admin = {
         body: JSON.stringify(body),
       })
     },
+    update(id, body) {
+      return authRequest(`${BASE}/admin/tags/${id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    },
     delete(id) { return authRequest(`${BASE}/admin/tags/${id}`, { method: 'DELETE' }) },
   },
 }

@@ -152,6 +152,16 @@ func (s *SQLiteStore) ListWithCount(ctx context.Context) ([]*TagWithCount, error
 	return list, rows.Err()
 }
 
+func (s *SQLiteStore) Update(ctx context.Context, t *Tag) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE tags SET name = ?, slug = ? WHERE id = ?`,
+		t.Name, t.Slug, t.ID,
+	)
+	return err
+}
+
 func (s *SQLiteStore) Delete(ctx context.Context, id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
