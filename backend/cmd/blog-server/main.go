@@ -90,16 +90,38 @@ func main() {
 	// 站点配置 API
 	api.GET("/site", func(c *gin.Context) { c.JSON(200, cfg.Site) })
 
-	// 上传
+	// 登录
+	api.POST("/admin/login", func(c *gin.Context) {
+		var body struct {
+			Username string `json:"username"`
+			Password string `json:"password"`
+		}
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(400, gin.H{"error": "invalid request"})
+			return
+		}
+		if body.Username != cfg.Admin.Username || !cfg.VerifyPassword(body.Password) {
+			c.JSON(401, gin.H{"error": "invalid credentials"})
+			return
+		}
+		token, err := middleware.GenerateToken(cfg.Admin.JWTSecret, body.Username)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "token generation failed"})
+			return
+		}
+		c.JSON(200, gin.H{"token": token})
+	})
+
+	// 上传（JWT 保护）
 	r.Static("/uploads", "./uploads")
-	r.POST("/api/upload", middleware.BasicAuth(cfg.Admin.Username, cfg.Admin.Password), uploadHandler)
+	r.POST("/api/upload", middleware.JWTAuth(cfg.Admin.JWTSecret), uploadHandler)
 
 	// RSS
 	r.GET("/rss.xml", func(c *gin.Context) { rssHandler(c, postSvc) })
 
-	// 管理端路由（Basic Auth 保护）
+	// 管理端路由（JWT 保护）
 	admin := api.Group("/admin")
-	admin.Use(middleware.BasicAuth(cfg.Admin.Username, cfg.Admin.Password))
+	admin.Use(middleware.JWTAuth(cfg.Admin.JWTSecret))
 
 	postH.RegisterAdmin(admin)
 	catH.RegisterAdmin(admin)

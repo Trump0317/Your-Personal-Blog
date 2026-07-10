@@ -6,8 +6,8 @@
     "path": "blog.db"
   },
   "admin": {
-    "username": "admin",
-    "password": "password"
+    "username": "123",
+    "password": "123456"
   },
   "site": {
     "name": "Your Personal Blog",

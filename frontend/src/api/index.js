@@ -91,22 +91,21 @@ export async function uploadFile(file) {
   return res.json()
 }
 
-// ── 管理端（需要 Basic Auth）──
-let authHeader = ''
+// ── 管理端（JWT Bearer Token）──
+let authToken = ''
 
-export function setAuth(user, pass) {
-  authHeader = 'Basic ' + btoa(user + ':' + pass)
+export function setAuth(token) {
+  authToken = token
 }
 
 function authRequest(url, opts = {}) {
   return request(url, {
     ...opts,
-    headers: { ...opts.headers, Authorization: authHeader },
+    headers: { ...opts.headers, Authorization: 'Bearer ' + authToken },
   })
 }
 
 export const admin = {
-  test() { return authRequest(`${BASE}/admin/posts?size=1`) },
 
   posts: {
     list(params) {

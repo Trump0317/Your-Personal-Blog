@@ -1,9 +1,14 @@
 package config
 
 import (
+	"crypto/rand"
+	"crypto/subtle"
+	"encoding/base64"
 	"encoding/json"
 	"log"
 	"os"
+
+	"golang.org/x/crypto/argon2"
 )
 
 type Config struct {
@@ -22,8 +27,11 @@ type Database struct {
 }
 
 type Admin struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username     string `json:"username"`
+	Password     string `json:"password"` // 从配置文件读取明文，启动后清除
+	PasswordHash string `json:"-"`         // Argon2 哈希（内存中）
+	PasswordSalt string `json:"-"`         // 盐值（内存中）
+	JWTSecret    string `json:"jwt_secret"`
 }
 
 type Site struct {
@@ -60,7 +68,48 @@ func Load() *Config {
 	// 环境变量覆盖
 	applyEnv(cfg)
 
+	// 哈希密码
+	cfg.hashPassword()
+
+	// 生成 JWT secret（如果未配置）
+	if cfg.Admin.JWTSecret == "" {
+		cfg.Admin.JWTSecret = randomString(32)
+	}
+
 	return cfg
+}
+
+func (cfg *Config) hashPassword() {
+	if cfg.Admin.Password == "" {
+		return
+	}
+	salt := make([]byte, 16)
+	if _, err := rand.Read(salt); err != nil {
+		log.Printf("config: failed to generate salt, password disabled")
+		cfg.Admin.Password = ""
+		return
+	}
+	cfg.Admin.PasswordSalt = base64.StdEncoding.EncodeToString(salt)
+	cfg.Admin.PasswordHash = base64.StdEncoding.EncodeToString(
+		argon2.IDKey([]byte(cfg.Admin.Password), salt, 1, 64*1024, 4, 32))
+	cfg.Admin.Password = "" // 清除明文
+}
+
+// VerifyPassword 验证密码
+func (cfg *Config) VerifyPassword(password string) bool {
+	if cfg.Admin.PasswordSalt == "" || cfg.Admin.PasswordHash == "" {
+		return false
+	}
+	salt, _ := base64.StdEncoding.DecodeString(cfg.Admin.PasswordSalt)
+	hash := argon2.IDKey([]byte(password), salt, 1, 64*1024, 4, 32)
+	expected, _ := base64.StdEncoding.DecodeString(cfg.Admin.PasswordHash)
+	return subtle.ConstantTimeCompare(hash, expected) == 1
+}
+
+func randomString(n int) string {
+	b := make([]byte, n)
+	rand.Read(b)
+	return base64.URLEncoding.EncodeToString(b)[:n]
 }
 
 func defaults() *Config {

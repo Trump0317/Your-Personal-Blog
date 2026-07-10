@@ -188,13 +188,23 @@ const authUser = ref('')
 const authPass = ref('')
 const loginError = ref('')
 
-function login() {
-  setAuth(authUser.value, authPass.value)
-  admin.test().then(() => {
-    authed.value = true; loginError.value = ''
-    localStorage.setItem('blog_auth', btoa(authUser.value + ':' + authPass.value))
+async function login() {
+  loginError.value = ''
+  try {
+    const res = await fetch('/api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: authUser.value, password: authPass.value }),
+    })
+    if (!res.ok) throw new Error('invalid')
+    const data = await res.json()
+    setAuth(data.token)
+    authed.value = true
+    localStorage.setItem('blog_token', data.token)
     loadAll()
-  }).catch(() => loginError.value = '登录失败')
+  } catch {
+    loginError.value = '登录失败'
+  }
 }
 
 // ── 数据 ──
@@ -471,13 +481,10 @@ async function delTag(id) {
 onBeforeUnmount(() => { if (editing.value) saveDraft() })
 
 // ── 初始化 ──
-const saved = localStorage.getItem('blog_auth')
-if (saved) {
-  try {
-    const [u, p] = atob(saved).split(':')
-    setAuth(u, p)
-    admin.test().then(() => { authed.value = true; loadAll() }).catch(() => localStorage.removeItem('blog_auth'))
-  } catch { localStorage.removeItem('blog_auth') }
+const savedToken = localStorage.getItem('blog_token')
+if (savedToken) {
+  setAuth(savedToken)
+  admin.posts.list({ size: 1 }).then(() => { authed.value = true; loadAll() }).catch(() => localStorage.removeItem('blog_token'))
 }
 </script>
 
