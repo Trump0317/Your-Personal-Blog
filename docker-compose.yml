@@ -1,0 +1,10 @@
+services:
+  blog:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./blog.db:/app/blog.db
+      - ./uploads:/app/uploads
+      - ./config.json:/app/config.json:ro
+    restart: unless-stopped

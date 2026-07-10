@@ -1,4 +1,4 @@
-.PHONY: dev build run clean
+.PHONY: dev build run clean docker-build docker-up docker-down test
 
 # ── 开发 ──
 dev:
@@ -20,12 +20,30 @@ build:
 run: build
 	./bin/blog-server
 
+# ── Docker ──
+docker-build:
+	docker build -t ypb:latest .
+
+docker-up:
+	docker compose up -d
+
+docker-down:
+	docker compose down
+
+# ── 测试 ──
+test:
+	cd backend && go test ./internal/...
+
 # ── 清理 ──
 clean:
 	rm -rf bin/ frontend/dist/ backend/blog.db
 
 help:
-	@echo "make dev      开发模式"
-	@echo "make build    生产构建"
-	@echo "make run      构建并运行"
-	@echo "make clean    清理"
+	@echo "make dev           开发模式"
+	@echo "make build         生产构建"
+	@echo "make run           构建并运行"
+	@echo "make docker-build  Docker 构建"
+	@echo "make docker-up     Docker 启动"
+	@echo "make docker-down   Docker 停止"
+	@echo "make test          运行测试"
+	@echo "make clean         清理"
