@@ -114,7 +114,7 @@
             ></textarea>
           </div>
           <div class="pane pane-preview">
-            <div class="preview-content" v-html="previewHTML"></div>
+            <div class="preview-content" ref="previewPane" v-html="previewHTML"></div>
           </div>
         </div>
 
@@ -177,8 +177,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, inject, onBeforeUnmount, nextTick } from 'vue'
+import { ref, reactive, computed, inject, onBeforeUnmount, nextTick, watch } from 'vue'
 import { setAuth, admin, uploadFile } from '../api'
+import { enhance } from '../composables/useEnhance.js'
 
 const toast = inject('toast')
 
@@ -301,6 +302,13 @@ async function deletePost(id) {
 const previewHTML = computed(() => {
   if (!form.content) return '<p class="muted">预览将显示在这里...</p>'
   return renderPreview(form.content)
+})
+
+// 每次预览更新后，增强 Mermaid 和 KaTeX
+const previewPane = ref(null)
+watch(previewHTML, async () => {
+  await nextTick()
+  enhance(previewPane.value)
 })
 
 function renderPreview(md) {

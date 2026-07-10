@@ -17,20 +17,22 @@
           </span>
         </div>
       </section>
-      <article class="article" v-html="post.html_content || plainText(post.content)"></article>
+      <article class="article" ref="articleEl" v-html="post.html_content || plainText(post.content)"></article>
     </template>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { posts } from '../api'
 import { useSite } from '../composables/useSite.js'
+import { enhance } from '../composables/useEnhance.js'
 
 const { site } = useSite()
 const route = useRoute()
 const post = ref(null)
+const articleEl = ref(null)
 const loading = ref(true)
 const error = ref('')
 const fmtDate = s => s ? new Date(s).toLocaleDateString('zh-CN') : ''
@@ -40,6 +42,8 @@ onMounted(async () => {
   try {
     post.value = await posts.get(route.params.slug)
     document.title = post.value.title + ' - ' + site.value.name
+    await nextTick()
+    enhance(articleEl.value)
   } catch (e) {
     error.value = '文章不存在'
   } finally {

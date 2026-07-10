@@ -327,6 +327,14 @@ footer .wrap { padding-top: 12px; padding-bottom: 44px; }
 
 @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
 
+/* ── Mermaid & KaTeX ── */
+.mermaid-rendered { display: flex; justify-content: center; margin: 1rem 0; overflow-x: auto; }
+.mermaid-rendered svg { max-width: 100%; height: auto; }
+.mermaid-error { color: #dc2626; padding: 8px; border: 1px dashed #dc2626; border-radius: 8px; }
+
+.katex-display { overflow-x: auto; overflow-y: hidden; }
+.katex { font-size: 1.1em; }
+
 /* ── Responsive ── */
 @media (max-width: 720px) {
   .wrap { padding-left: 20px; padding-right: 20px; }
