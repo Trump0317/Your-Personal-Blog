@@ -2,7 +2,7 @@
   <div id="app">
     <header>
       <div class="wrap top">
-        <router-link to="/" class="brand">My Blog.</router-link>
+        <router-link to="/" class="brand">{{ site.name }}.</router-link>
         <nav class="nav">
           <router-link to="/">首页</router-link>
           <router-link to="/archive">归档</router-link>
@@ -25,8 +25,8 @@
       <div class="wrap">
         <div class="site-footer-top">
           <div>
-            <div class="site-footer-title">My Blog</div>
-            <p class="site-footer-description">探索技术、设计与思考的交汇。<br/>以极简致敬繁复。</p>
+            <div class="site-footer-title">{{ site.name }}</div>
+            <p class="site-footer-description">{{ site.description }}</p>
           </div>
           <div class="site-footer-links">
             <router-link to="/">首页</router-link>
@@ -36,8 +36,8 @@
           </div>
         </div>
         <div class="site-footer-bottom">
-          <span>&copy; {{ year }} My Blog.</span>
-          <span class="site-footer-note">无广告 · 无付费软文 · 支持公开勘误</span>
+          <span>&copy; {{ year }} Your Personal Blog.</span>
+          <span class="site-footer-note">{{ site.footer_note }}</span>
         </div>
       </div>
     </footer>
@@ -54,12 +54,15 @@
 <script setup>
 import { useDark } from './composables/useDark.js'
 import { useToast } from './composables/useToast.js'
-import { provide } from 'vue'
+import { useSite } from './composables/useSite.js'
+import { provide, onMounted } from 'vue'
 
 const { isDark, toggle: toggleDark } = useDark()
 const { toasts, show } = useToast()
+const { site, fetchSite } = useSite()
 
 provide('toast', show)
+onMounted(fetchSite)
 
 const year = new Date().getFullYear()
 </script>

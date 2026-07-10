@@ -26,7 +26,9 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { posts } from '../api'
+import { useSite } from '../composables/useSite.js'
 
+const { site } = useSite()
 const route = useRoute()
 const post = ref(null)
 const loading = ref(true)
@@ -37,7 +39,7 @@ const plainText = t => t ? t.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/
 onMounted(async () => {
   try {
     post.value = await posts.get(route.params.slug)
-    document.title = post.value.title + ' - My Blog'
+    document.title = post.value.title + ' - ' + site.value.name
   } catch (e) {
     error.value = '文章不存在'
   } finally {

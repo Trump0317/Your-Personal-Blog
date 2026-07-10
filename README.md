@@ -24,14 +24,45 @@ go run ./cmd/blog-server/
 # 默认账号  admin / password
 ```
 
-### 环境变量
+### 配置
 
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `BLOG_PORT` | `:8080` | 监听地址 |
-| `BLOG_DB` | `blog.db` | SQLite 数据库路径 |
-| `BLOG_ADMIN_USER` | `admin` | 管理员用户名 |
-| `BLOG_ADMIN_PASS` | `password` | 管理员密码 |
+通过项目根目录的 `config.json` 文件配置，环境变量优先生效。
+
+**配置文件** (`config.json`)：
+```json
+{
+  "server":  { "port": ":8080" },
+  "database": { "path": "blog.db" },
+  "admin": { "username": "admin", "password": "password" },
+  "site": {
+    "name": "Your Personal Blog",
+    "tagline": "探索技术、设计与思考的交汇",
+    "description": "...",
+    "hero_kicker": "Daily Engineering Notes",
+    "hero_title1": "代码.",
+    "hero_title2": "匠心.",
+    "hero_title3": "文化.",
+    "hero_desc": "...",
+    "about_title": "关于 Your Personal Blog",
+    "about_text": "...",
+    "footer_note": "..."
+  }
+}
+```
+
+自定义配置文件路径: `BLOG_CONFIG=/path/to/my-config.json`
+
+**环境变量覆盖**（优先级高于配置文件）：
+
+| 变量 | 说明 |
+|------|------|
+| `BLOG_PORT` | 监听地址 |
+| `BLOG_DB` | SQLite 数据库路径 |
+| `BLOG_ADMIN_USER` | 管理员用户名 |
+| `BLOG_ADMIN_PASS` | 管理员密码 |
+| `BLOG_SITE_NAME` | 站点名称 |
+| `BLOG_SITE_TAGLINE` | 站点标语 |
+| … | (所有 site.* 字段均可覆盖) |
 
 ## 项目结构
 

@@ -34,7 +34,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { posts, categories } from '../api'
+import { useSite } from '../composables/useSite.js'
 
+const { site } = useSite()
 const route = useRoute()
 const category = ref(null)
 const postsList = ref([])
@@ -66,7 +68,7 @@ onMounted(async () => {
   try {
     const cat = await categories.get(route.params.slug)
     category.value = cat
-    document.title = (cat.name || '分类') + ' - My Blog'
+    document.title = (cat.name || '分类') + ' - ' + site.value.name
     await fetchPosts(cat.id)
   } catch {
     category.value = null

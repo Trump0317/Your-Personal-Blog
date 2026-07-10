@@ -35,7 +35,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { posts, tags } from '../api'
+import { useSite } from '../composables/useSite.js'
 
+const { site } = useSite()
 const route = useRoute()
 const tag = ref(null)
 const postsList = ref([])
@@ -63,7 +65,7 @@ onMounted(async () => {
   try {
     const t = await tags.get(route.params.slug)
     tag.value = t
-    document.title = (t.name || '标签') + ' - My Blog'
+    document.title = (t.name || '标签') + ' - ' + site.value.name
     await fetchPosts(t.id)
   } catch {
     tag.value = null

@@ -2,13 +2,13 @@
   <div class="home">
     <!-- Hero -->
     <section class="hero home-hero">
-      <p class="kicker">Daily Engineering Notes</p>
+      <p class="kicker">{{ site.hero_kicker }}</p>
       <h1 class="title home-lines">
-        <span>代码.</span>
-        <span>匠心.</span>
-        <span class="is-muted">文化.</span>
+        <span>{{ site.hero_title1 }}</span>
+        <span>{{ site.hero_title2 }}</span>
+        <span class="is-muted">{{ site.hero_title3 }}</span>
       </h1>
-      <p class="desc">探索软件架构、工程美学与人类体验的交汇点。以工匠精神，雕琢每一行代码。</p>
+      <p class="desc">{{ site.hero_desc }}</p>
       <div class="meta">
         <span>共 {{ siteStats.post_count || 0 }} 篇文章</span>
         <span>分类 {{ siteStats.category_count || 0 }} 个</span>
@@ -16,11 +16,6 @@
       <div class="home-actions">
         <a href="#latest-posts" class="primary">查看最新文章</a>
         <router-link to="/categories" class="secondary">浏览主题</router-link>
-      </div>
-      <div class="home-trust">
-        <span class="trust-badge">无广告</span>
-        <span class="trust-badge">无付费软文</span>
-        <span class="trust-badge">支持公开勘误</span>
       </div>
     </section>
 
@@ -45,22 +40,6 @@
           <div class="featured-count">{{ cat.post_count || 0 }} 篇文章</div>
         </router-link>
       </div>
-    </section>
-
-    <!-- 信任声明 -->
-    <section class="trust-grid">
-      <article class="trust-card">
-        <h3>广告策略</h3>
-        <p>本站不投放展示广告，不嵌入联盟分成链接。</p>
-      </article>
-      <article class="trust-card">
-        <h3>利益披露</h3>
-        <p>若未来存在合作内容，会在标题区和文首显式标注。</p>
-      </article>
-      <article class="trust-card">
-        <h3>内容勘误</h3>
-        <p>发现错误可邮件反馈，确认后会修订并在文章中体现。</p>
-      </article>
     </section>
 
     <!-- 最新文章 -->
@@ -103,6 +82,9 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { stats as statsApi, posts as postsApi, categories } from '../api'
+import { useSite } from '../composables/useSite.js'
+
+const { site } = useSite()
 
 const fmtDate = s => s ? new Date(s).toLocaleDateString('zh-CN') : ''
 const monthLabel = s => { if (!s) return ''; const d = new Date(s); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') }
@@ -149,7 +131,7 @@ function go(p) {
 }
 
 onMounted(async () => {
-  document.title = 'My Blog - 探索技术、设计与思考'
+  document.title = site.value.name + ' - ' + site.value.tagline
   await fetchPosts()
   try {
     const [s, c] = await Promise.all([statsApi.get(), categories.list()])

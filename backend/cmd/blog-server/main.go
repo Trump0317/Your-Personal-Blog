@@ -22,7 +22,7 @@ import (
 )
 
 func main() {
-	cfg := config.Default()
+	cfg := config.Load()
 
 	// 1. 数据库
 	db, err := sql.Open("sqlite3", cfg.Database.Path)
@@ -86,6 +86,9 @@ func main() {
 	postH.RegisterPublic(api)
 	catH.RegisterPublic(api)
 	tagH.RegisterPublic(api)
+
+	// 站点配置 API
+	api.GET("/site", func(c *gin.Context) { c.JSON(200, cfg.Site) })
 
 	// 上传
 	r.Static("/uploads", "./uploads")
