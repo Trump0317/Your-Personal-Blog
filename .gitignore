@@ -6,7 +6,10 @@
 go.work go.work.sum
 
 # SQLite
-*.db *.db-journal *.db-shm *.db-wal
+blog.db
+*.db-journal
+*.db-shm
+*.db-wal
 
 # Build outputs
 bin/
@@ -16,11 +19,17 @@ backend/blog-server
 frontend/node_modules/
 frontend/dist/
 
-# Misc
-data/ uploads/ *.log .env
+# Node.js (temporary, for build scripts)
+node_modules/
+package-lock.json
+
+# Generated outputs
+doc/
+scripts/
+
+# Data
+uploads/ *.log .env
 
 # Editor
 .idea/ .vscode/
 .DS_Store Thumbs.db
-
-doc/
